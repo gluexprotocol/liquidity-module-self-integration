@@ -11,7 +11,11 @@ class MyProtocolLiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int, 
     ) -> tuple[int | None, int | None]:
+        
         # Implement logic to calculate output amount given input amount
+
+        # This is a simple implementation for a constant-product pool
+        # The function is based on the Uniswap V2 formula for calculating the output amount of a swap
 
         if input_token.address == fixed_parameters['token0']:
             reserve_in = pool_state.Reserves.value['reserve0']
@@ -36,7 +40,11 @@ class MyProtocolLiquidityModule(LiquidityModule):
         output_token: Token,
         output_amount: int
     ) -> tuple[int | None, int | None]:
+        
         # Implement logic to calculate required input amount given output amount
+
+        # This is a simple implementation for a constant-product pool
+        # The function is based on the Uniswap V2 formula for calculating the input amount of a swap
 
         if input_token.address == fixed_parameters["token0"]:
             reserve_in = pool_state.Reserves.value['reserve0']
