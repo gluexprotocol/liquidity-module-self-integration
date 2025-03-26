@@ -30,14 +30,16 @@ class MyProtocolLiquidityModule(LiquidityModule):
             if is_lp_token_in:
                 # burn
                 fee_amount, amount_out = self.lp_token_burn_wrapper(
-                    token0_out = output_token.address.lower() == self.tokens_addresses[0].lower(),
+                    pool_state=pool_state,
+                    token0_out = output_token.address.lower() == fixed_parameters['tokens_address0'].lower(),
                     lp_token_amount = input_amount
                 )
             else:
                 # mint        
                 fee_amount, amount_out = self.lp_token_mint_wrapper(
-                    amount0 = input_amount if input_token.address.lower() == self.tokens_addresses[0].lower() else 0,
-                    amount1 = input_amount if input_token.address.lower() == self.tokens_addresses[1].lower() else 0
+                    pool_state=pool_state,
+                    amount0 = input_amount if input_token.address.lower() == fixed_parameters['tokens_address0'].lower() else 0,
+                    amount1 = input_amount if input_token.address.lower() == fixed_parameters['tokens_address1'].lower() else 0
                 )
                 
         else:
@@ -50,13 +52,12 @@ class MyProtocolLiquidityModule(LiquidityModule):
                 reserve_out = pool_state['reserve0']
 
             if not reserve_in or not reserve_out:
-
                 fee = None
                 amount = None
                 
                 return fee, amount
             
-            fee_amount, amount_out = self.swap(reserve_in=reserve_in, reserve_out = reserve_out, amount_in = input_amount)
+            fee_amount, amount_out = self.swap(reserve_in=reserve_in, reserve_out=reserve_out, amount_in=input_amount)
 
         fee = fee_amount
         amount = amount_out
@@ -91,13 +92,7 @@ class MyProtocolLiquidityModule(LiquidityModule):
             reserve_in = pool_state['reserve1']
             reserve_out = pool_state['reserve0']
 
-        fee_amount, amount_in = self.swap(reserve_in = reserve_in, reserve_out = reserve_out, amount_out = output_amount)
-
-        # NOTE: 
-        # Uniswap v2 fees are denominated in token_in. 
-        # Hence, it's not necessary to map fee_amount to token_in.
-        # If fee_amount would be denominated in token_out, then
-        # a mapping from token_out to token_in would be required.
+        fee_amount, amount_in = self.swap(reserve_in=reserve_in, reserve_out=reserve_out, amount_out=output_amount)
 
         fee = fee_amount
         amount = amount_in
@@ -105,13 +100,11 @@ class MyProtocolLiquidityModule(LiquidityModule):
         return fee, amount
     
     def get_apy(self, pool_state: Dict) -> Decimal:
-        
         # Implement APY calculation logic
-        fees_24h = pool_state['fees_24h']
-        tvl = pool_state['tvl']
-        fee_tier = pool_state['fee_tier']
+        fees_24h = pool_state.get('fees_24h', 0)
+        tvl = pool_state.get('tvl', 0)
 
-        daily_yield = fees_24h / tvl
+        daily_yield = fees_24h / tvl if tvl else 0
 
         apy_simple = daily_yield * 365
 
@@ -120,9 +113,8 @@ class MyProtocolLiquidityModule(LiquidityModule):
         return apy_compounded
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
-        
         # Implement TVL calculation logic
-        return pool_state['tvl']
+        return pool_state.get('tvl', 0)
 
     def swap(
         self,
@@ -133,11 +125,11 @@ class MyProtocolLiquidityModule(LiquidityModule):
     ) -> tuple[int | None, int | None]:
         
         '''
-			Calculation for amount out or amount_in of constant-product pools given reserves.
+        Calculation for amount out or amount_in of constant-product pools given reserves.
 
-			Source sample:
-			https://etherscan.io/address/0x7a250d5630b4cf539739df2c5dacb4c659f2488d#code 
-		'''
+        Source sample:
+        https://etherscan.io/address/0x7a250d5630b4cf539739df2c5dacb4c659f2488d#code 
+        '''
         
         if amount_out is None:
 
@@ -166,9 +158,8 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
         return int(fee_amount), int(amount)
     
-    
     '''
-        LP Token swap Methods
+    LP Token swap Methods
     '''
 
     # helper function that returns if lp_tokens are involved in swap along with direction of swap, if an lp_token is involved
@@ -184,23 +175,40 @@ class MyProtocolLiquidityModule(LiquidityModule):
         
         return (False, None)
     
-    
     # lp swap function
     def lp_token_mint_wrapper(
         self,
+        pool_state: Dict,
         amount0: int,
         amount1: int
     ):
         
         '''
-            Interactions in mint:
-            - Swap 50% of token1 for token2
-            - Mint lp tokens using 50% of token1 and token2  recevied from swap        
+        Interactions in mint:
+        - Swap 50% of token1 for token2
+        - Mint lp tokens using 50% of token1 and token2  recevied from swap        
         '''
 
+        # Use pool_state for reserves
+        reserve0 = int(pool_state['reserve0'])
+        reserve1 = int(pool_state['reserve1'])
+        
+        # Get LP swap states from pool_state
+        feeTo = pool_state.get('feeTo', '')
+        _kLast = int(pool_state.get('kLast', 0))
+        totalSupply = int(pool_state.get('totalSupply', 0))
+        MINIMUM_LIQUIDITY = int(pool_state.get('MINIMUM_LIQUIDITY', 1000))
+
         _, _, _, lp_amount = self._lp_mint(
-            amount0 = amount0,
-            amount1 = amount1
+            pool_state=pool_state,
+            amount0=amount0,
+            amount1=amount1,
+            reserve0=reserve0,
+            reserve1=reserve1,
+            feeTo=feeTo,
+            _kLast=_kLast,
+            totalSupply=totalSupply,
+            MINIMUM_LIQUIDITY=MINIMUM_LIQUIDITY
         )        
         fee_amount = 0
 
@@ -213,41 +221,61 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
         return fee_amount, lp_amount   
     
-
     # lp swap function
     def lp_token_burn_wrapper(
         self,
+        pool_state: Dict,
         token0_out: bool,
         lp_token_amount: int
     ):
         
         '''
-            Interactions in burn:
-            - Call burn - returns both token0 and token1
-            - swap received token1 for token0 if token_out is token0, vice-versa      
+        Interactions in burn:
+        - Call burn - returns both token0 and token1
+        - swap received token1 for token0 if token_out is token0, vice-versa      
         '''
 
+        # Use pool_state for reserves
+        reserve0 = int(pool_state['reserve0'])
+        reserve1 = int(pool_state['reserve1'])
+        
+        # Get LP swap states from pool_state
+        feeTo = pool_state.get('feeTo', '')
+        _kLast = int(pool_state.get('kLast', 0))
+        totalSupply = int(pool_state.get('totalSupply', 0))
+        liquidity = int(pool_state.get('liquidity', 0)) + lp_token_amount
+
         _, _, _, amount_received = self._lp_burn(
-            token0_out = token0_out,
-            lp_token_amount = lp_token_amount
+            pool_state=pool_state,
+            token0_out=token0_out,
+            lp_token_amount=lp_token_amount,
+            reserve0=reserve0,
+            reserve1=reserve1,
+            feeTo=feeTo,
+            _kLast=_kLast,
+            totalSupply=totalSupply,
+            liquidity=liquidity
         )
 
         fee_amount = 0
         return fee_amount, amount_received
   
-
     # This function gives the intermediate amounts at all interactions with minting lp tokens
     # This method will be used by the executors
     # Returns:
     # amount of token0 used in token-swap, amount of token0 used in mint, amount of token1 received from swap, amount of lp token recevied from mint
     def _lp_mint(
         self,
+        pool_state: Dict,
         amount0: int,
-        amount1: int
+        amount1: int,
+        reserve0: int,
+        reserve1: int,
+        feeTo: str,
+        _kLast: int,
+        totalSupply: int,
+        MINIMUM_LIQUIDITY: int
     ):
-        reserve0 = int(self.states.Reserves.value['reserve0'])
-        reserve1 = int(self.states.Reserves.value['reserve1'])
-        
         # swap 50% of tokenIn
         if amount0 == 0:
             amount1_half = amount1 // 2
@@ -268,14 +296,6 @@ class MyProtocolLiquidityModule(LiquidityModule):
             reserve0 -= amount0_received
             reserve1 += amount1_half
 
-            # Get states need for LP_token_swap
-            feeTo: str = self.states.FeeTo.value
-            _kLast: int = int(self.states.KLast.value)
-            totalSupply: int = int(self.states.TotalSupply.value)
-            MINIMUM_LIQUIDITY: int = int(self.states.MINIMUM_LIQUIDITY.value)
-
-            # for lp_token_swap, we will transfer tokens to the pool and then call mint
-            
             try:
                 lp_amount = LPTokenSwap.mint(
                     _reserve0 = reserve0,
@@ -290,8 +310,6 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
                 lp_amount = int(lp_amount) if lp_amount is not None else lp_amount
             except Exception as e:
-                if self.enableDebugLogs:
-                    print(e)
                 lp_amount = None
             
             return int(amount1), int(amount1_half), int(amount0_received), lp_amount
@@ -314,14 +332,6 @@ class MyProtocolLiquidityModule(LiquidityModule):
             reserve1 -= amount1_received
             reserve0 += amount0_half
 
-            # Get states need for LP_token_in swap
-            feeTo: str = self.states.FeeTo.value
-            _kLast: int = int(self.states.KLast.value)
-            totalSupply: int = int(self.states.TotalSupply.value)
-            MINIMUM_LIQUIDITY: int = int(self.states.MINIMUM_LIQUIDITY.value)
-
-            # for lp_token_swap, we will transfer tokens to the pool and then call mint
-            
             try:
                 lp_amount = LPTokenSwap.mint(
                     _reserve0 = reserve0,
@@ -336,36 +346,30 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
                 lp_amount = int(lp_amount) if lp_amount is not None else lp_amount
             except Exception as e:
-                if self.enableDebugLogs:
-                    print(e)
                 lp_amount = None
             
-
             return int(amount0), int(amount0_half), int(amount1_received), lp_amount
     
-
     # This function gives the intermediate amounts at all interactions with burning lp tokens
     # This method will be used by the executors
     # Returns:
     # amount of token1 recevied from burn, amount of token0 recevied from burn, amount of token0 recevied from token-swap, total amount of token0 received
     def _lp_burn(
         self,
+        pool_state: Dict,
         token0_out: bool,
-        lp_token_amount: int
+        lp_token_amount: int,
+        reserve0: int,
+        reserve1: int,
+        feeTo: str,
+        _kLast: int,
+        totalSupply: int,
+        liquidity: int
     ):
         
         '''
-            BURN
+        BURN
         '''
-
-        reserve0 = int(self.states.Reserves.value['reserve0'])
-        reserve1 = int(self.states.Reserves.value['reserve1'])
-        
-        # Get states need for LP_token_in swap
-        feeTo: str = self.states.FeeTo.value
-        _kLast: int = int(self.states.KLast.value)
-        totalSupply: int = int(self.states.TotalSupply.value)
-        liquidity: int = int(self.states.Liquidity.value) + lp_token_amount
 
         try:
             (amount0_received, amount1_received) = LPTokenSwap.burn(
@@ -383,7 +387,7 @@ class MyProtocolLiquidityModule(LiquidityModule):
             reserve0 -= amount0_received
             reserve1 -= amount1_received
 
-            if reserve0 <=0 or reserve1 <= 0:
+            if reserve0 <= 0 or reserve1 <= 0:
                 return None, None, None, None
 
             if token0_out: # only token0 should be received from the swap
@@ -423,8 +427,4 @@ class MyProtocolLiquidityModule(LiquidityModule):
                 return int(amount0_received), int(amount1_received), int(amount1_received_from_token_swap), int(total_amount1_received)
             
         except Exception as e:
-
-            if self.enableDebugLogs:
-                print(e)
-
             return None, None, None, None
