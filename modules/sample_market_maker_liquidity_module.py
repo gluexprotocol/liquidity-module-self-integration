@@ -1,81 +1,96 @@
-from templates.liquidity_module import LiquidityModule, Token
-from typing import Dict, Optional
+import aiohttp
+import asyncio
+from templates.liquidity_module import Token
+from typing import Dict, Tuple, Literal
 from decimal import Decimal
 
-class MarketMakerLiquidityModule(LiquidityModule):
-    def get_amount_out(
-        self, 
-        pool_states: Dict, 
-        fixed_parameters: Dict,
-        input_token: Token, 
-        output_token: Token,
-        input_amount: int, 
-    ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
-        ## a list of token pairs supported by market maker
-        token_pairs: list[str] = pool_states.get("token_pairs", [])
-        
-        desired_pair: str = input_token.address + "_" + output_token.address
-        
-        ## If the desired pair is not in the list of token pairs, return None
-        if desired_pair not in token_pairs:
-            return None, None
-        
-        ## Get the price levels for the desired pair made available by the market maker
-        ## The price levels are a dictionary where the key is the token pair and the value is a list of tuples of amount and price
-        pricelevels: dict[str, list[tuple[int, int]]] = pool_states.get("pricelevels", {})
-        
-        ## If the desired pair is not in the price levels, return None
-        if desired_pair not in pricelevels:
-            return None, None
-        
-        ## Get the price levels for the desired pair
-        levels: list[tuple[int, int]] = pricelevels[desired_pair]
-        ## If the levels are empty, return None
-        if len(levels) == 0:
-            return None, None
+class MarketMakerLiquidityModule:
 
-        if input_amount < levels[0][0]:
-            return None, None
-        
-        ## Iterate through the levels and find the amount and price
-        remaining_amount: int = input_amount
-        output_amount: int = 0
-        for l in levels:
-            vol_in_level: int = l[0]
-            price_in_level: int = l[1]
-            if remaining_amount <= vol_in_level:
-                output_amount += remaining_amount * price_in_level
-                remaining_amount = 0
-            else:
-                output_amount += vol_in_level * price_in_level
-                remaining_amount -= vol_in_level
-                
-            if remaining_amount == 0:
-                break
-            
-        if remaining_amount > 0:
-            return None, None
-        
-        return 0, int(output_amount)
-            
-        
-
-    def get_amount_in(
-        self, 
-        pool_state: Dict, 
+    async def get_sell_quote(
         fixed_parameters: Dict,
         input_token: Token,
         output_token: Token,
-        output_amount: int
-    ) -> tuple[int | None, int | None]:
+        input_amount: int,
+        block: Literal['latest', int] = 'latest'
+    ) -> Tuple[int | None, int | None]:
 
-        pass
+        market_maker_api = fixed_parameters.get("market_maker_api")
+        api_key = fixed_parameters.get("api_key", None)
+        chain = fixed_parameters.get("chain", "ethereum")
+        user_address = fixed_parameters.get("user_address")
 
-    def get_apy(self, pool_state: Dict) -> Decimal:
+        # Construct the URL for the API call
+        url = f"{market_maker_api}/sellQuote"
+        
+        body = {
+            "chain": chain,
+            "sell_token": input_token.address,
+            "buy_token": output_token.address,
+            "sell_amounts": input_amount,
+            "user_address": user_address
+        }
 
-        pass
 
-    def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
+        headers = {
+            "api-key": api_key,
+        }
 
-        pass
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(url, headers=headers, json=body) as resp:
+                    data = await resp.json()
+                    
+                    if "SUCCESS" not in data.get("status", ""):
+                        return None, None
+                    
+                    output_amount = data.get("buy_amount")
+
+                    return 0, amount_out
+
+            except Exception as e:
+                print(f"Error fetching sell quote: {e}")
+                return None, None
+
+    async def get_buy_quote(
+        fixed_parameters: Dict,
+        input_token: Token,
+        output_token: Token,
+        output_amount: int,
+        block: Literal['latest', int] = 'latest'
+    ) -> Tuple[int | None, int | None]:
+
+        market_maker_api = fixed_parameters.get("market_maker_api")
+        api_key = fixed_parameters.get("api_key", None)
+        chain = fixed_parameters.get("chain", "ethereum")
+        user_address = fixed_parameters.get("user_address")
+
+        # Construct the URL for the API call
+        url = f"{market_maker_api}/buyQuote"
+        
+        body = {
+            "chain": chain,
+            "buy_token": output_token.address,
+            "sell_token": input_token.address,
+            "buy_amount": output_amount,
+            "user_address": user_address
+        }
+
+        headers = {
+            "api-key": api_key,
+        }
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(url, headers=headers, json=body) as resp:
+                    data = await resp.json()
+                    
+                    if "SUCCESS" not in data.get("status", ""):
+                        return None, None
+                    
+                    input_amount = data.get("sell_amount")
+
+                    return 0, input_amount
+
+            except Exception as e:
+                print(f"Error fetching buy quote: {e}")
+                return None, None
