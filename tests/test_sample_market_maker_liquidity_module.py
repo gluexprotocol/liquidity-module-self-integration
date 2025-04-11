@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, AsyncMock
 import sys
 from os import listdir, path, walk
 
@@ -11,50 +12,70 @@ from decimal import Decimal
 from templates.liquidity_module import Token
 from modules.sample_market_maker_liquidity_module import MarketMakerLiquidityModule  # Replace with the actual module name
 
-class TestMarketMakerLiquidityModule(unittest.TestCase):
+class TestMarketMakerLiquidityModule(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.liquidity_module = MarketMakerLiquidityModule()
-        self.token_a = Token(address="0xTokenA", symbol="TokenA", decimals=18, reference_price=Decimal("0.0001"))
-        self.token_b = Token(address="0xTokenB", symbol="TokenB", decimals=18, reference_price=Decimal("0.0002"))
-        self.pool_states = {
-            "token_pairs": ["0xTokenA_0xTokenB"],
-            "pricelevels": {
-                "0xTokenA_0xTokenB": [
-                    (100, 2000000),  # 100 TokenA available at a rate of 2000000 TokenB per TokenA
-                    (200, 1500000),  # 200 TokenA available at a rate of 1500000 TokenB per TokenA
-                ]
-            }
+        self.fixed_parameters = {
+            "market_maker_api": "https://mock.api",
+            "api_key": "test-api-key",
+            "chain": "ethereum",
+            "user_address": "0xuser"
         }
-        self.fixed_parameters = {}
-    
-    def test_get_amount_out_valid(self):
-        input_amount = 150  # Requesting 150 TokenA
-        expected_output = int(100 * 2000000 + 50 * 1500000)  # 100 at rate 2.000000 + 50 at rate 1.500000
-        _, output_amount = self.liquidity_module.get_amount_out(
-            self.pool_states, self.fixed_parameters, self.token_a, self.token_b, input_amount
-        )
-        self.assertEqual(output_amount, expected_output)
+        self.input_token = Token(address="0xinput", symbol="InputToken", decimals=18, reference_price=Decimal("0.0001"))
+        self.output_token = Token(address="0xoutput", symbol="OutputToken", decimals=18, reference_price=Decimal("0.0002"))
 
-    def test_get_amount_out_insufficient_liquidity(self):
-        input_amount = 500  # More than available liquidity
-        result = self.liquidity_module.get_amount_out(
-            self.pool_states, self.fixed_parameters, self.token_a, self.token_b, input_amount
-        )
-        self.assertEqual(result, (None, None))
+    @patch("aiohttp.ClientSession.post")
+    async def test_get_sell_quote_success(self, mock_post):
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={
+            "status": "SUCCESS",
+            "buy_amount": 1000
+        })
+        mock_post.return_value.__aenter__.return_value = mock_response
 
-    def test_get_amount_out_no_price_levels(self):
-        pool_states_no_levels = {"token_pairs": ["0xTokenA_0xTokenB"], "pricelevels": {}}
-        result = self.liquidity_module.get_amount_out(
-            pool_states_no_levels, self.fixed_parameters, self.token_a, self.token_b, 50
+        fee, amount = await MarketMakerLiquidityModule.get_sell_quote(
+            self.fixed_parameters, self.input_token, self.output_token, 500
         )
-        self.assertEqual(result, (None, None))
 
-    def test_get_amount_out_pair_not_supported(self):
-        token_c = Token(address="0xTokenC", symbol="TokenC", decimals=18, reference_price=Decimal("0.0003"))
-        result = self.liquidity_module.get_amount_out(
-            self.pool_states, self.fixed_parameters, token_c, self.token_b, 50
+        self.assertEqual(fee, 0)
+        self.assertEqual(amount, 1000)
+
+    @patch("aiohttp.ClientSession.post")
+    async def test_get_sell_quote_failure(self, mock_post):
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={"status": "FAILED"})
+        mock_post.return_value.__aenter__.return_value = mock_response
+
+        fee, amount = await MarketMakerLiquidityModule.get_sell_quote(
+            self.fixed_parameters, self.input_token, self.output_token, 500
         )
-        self.assertEqual(result, (None, None))
+        self.assertIsNone(fee)
+        self.assertIsNone(amount)
 
-if __name__ == "__main__":
-    unittest.main()
+    @patch("aiohttp.ClientSession.post")
+    async def test_get_buy_quote_success(self, mock_post):
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={
+            "status": "SUCCESS",
+            "sell_amount": 800
+        })
+        mock_post.return_value.__aenter__.return_value = mock_response
+
+        fee, amount = await MarketMakerLiquidityModule.get_buy_quote(
+            self.fixed_parameters, self.input_token, self.output_token, 1000
+        )
+        self.assertEqual(fee, 0)
+        self.assertEqual(amount, 800)
+
+    @patch("aiohttp.ClientSession.post")
+    async def test_get_buy_quote_failure(self, mock_post):
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value={"status": "ERROR"})
+        mock_post.return_value.__aenter__.return_value = mock_response
+
+        fee, amount = await MarketMakerLiquidityModule.get_buy_quote(
+            self.fixed_parameters, self.input_token, self.output_token, 1000
+        )
+        self.assertIsNone(fee)
+        self.assertIsNone(amount)
+
+unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(TestMarketMakerLiquidityModule))

@@ -45,7 +45,7 @@ class MarketMakerLiquidityModule:
                     
                     output_amount = data.get("buy_amount")
 
-                    return 0, amount_out
+                    return 0, output_amount
 
             except Exception as e:
                 print(f"Error fetching sell quote: {e}")
