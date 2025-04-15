@@ -114,7 +114,10 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         # Implement TVL calculation logic
-        return pool_state.get('tvl', 0)
+        reserve0 = pool_state.get('reserve0', 0)
+        reserve1 = pool_state.get('reserve1', 0)
+
+        return reserve0 + reserve1
 
     def swap(
         self,
