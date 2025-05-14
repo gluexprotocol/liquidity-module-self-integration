@@ -1,5 +1,5 @@
 from templates.liquidity_module import LiquidityModule, Token
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from decimal import Decimal
 
 from requests import post
@@ -77,6 +77,24 @@ class LatchLiquidityModule(LiquidityModule):
             return Decimal(0)
         
 
-    def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
-        # Implement TVL calculation logic
-        pass
+    def get_tvl(self, pool_state: Dict) -> Decimal:
+        """
+        Fetches the Tvl for a given pool state from the Latch API.
+        Args:
+            pool_state["atUSDSupply"] (int): The total supply of the atUSD token.
+            pool_state["atETHSupply"] (int): The total supply of the atETH token.
+            pool_state["ETHPrice"] (int): The current price of ETH in USD.
+        Returns:
+            Decimal: The Tvl for the given pool state in USD.
+        """
+
+        atUSDSupply = pool_state["atUSDSupply"]
+        atETHSupply = pool_state["atETHSupply"]
+        ETHPrice = pool_state["ETHPrice"]
+
+        try:
+            return Decimal(atUSDSupply) + (Decimal(atETHSupply) * Decimal(ETHPrice))
+        except Exception as e:
+            print(f"Error fetching Tvl for Latch Vault: {e}")
+            return Decimal(0)
+
