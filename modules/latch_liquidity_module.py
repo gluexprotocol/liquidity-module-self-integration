@@ -29,6 +29,14 @@ class LatchLiquidityModule(LiquidityModule):
 
 
     def __get_apy(self, poolAddress: str) -> Decimal:
+        """
+        Fetches the APY for a given pool address from the Latch API.
+        Args:
+            poolAddress (str): The address of the pool to fetch the APY for.
+        Returns:
+            Decimal: The APY for the given pool address in decimal. 0.01 = 1%.
+        """
+
         url = "https://savings-graphigo.prd.latch.io/query"
 
         headers = {
@@ -48,6 +56,14 @@ class LatchLiquidityModule(LiquidityModule):
         return Decimal(response.json()["data"]["GetAPYs"])
     
     def get_apy(self, pool_state: Dict) -> Decimal:
+        """
+        Fetches the APY for a given pool state from the Latch API.
+        Args:
+            pool_state["VaultName"] (str): The name of the vault to fetch the APY for. Either "USDT" or "ETH".
+        Returns:
+            Decimal: The APY for the given pool state in decimal. 0.01 = 1%.
+        """
+
         vaultName = pool_state["VaultName"]
         if vaultName == "USDT":
             poolAddress = "0xc4af68Dd5b96f0A544c4417407773fEFDc97F58d"
