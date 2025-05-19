@@ -1,11 +1,22 @@
 from templates.liquidity_module import LiquidityModule, Token
 from typing import Dict, Optional
 from decimal import Decimal
+import math
 
 ETHER = Decimal("1e18")
 
 class MyProtocolLiquidityModule(LiquidityModule):
-    def get_amount_out(
+    def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
+        totalAssets = pool_state["totalAssets"]
+        totalSupply = pool_state["totalSupply"]
+        decimals = fixed_parameters["decimals"]
+
+        return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
+
+    def _wei_to_ether(self, amount: int) -> Decimal:
+        return Decimal(amount) / ETHER
+
+    def get_deposit_amount(
         self, 
         pool_states: Dict, 
         fixed_parameters: Dict,
@@ -13,19 +24,31 @@ class MyProtocolLiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int, 
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
-        pass
+        """
+        Deposit underlying asset into the pool and receive shares in return.
+        """
+        sharePrice = pool_states["sharePrice"]
 
-    def get_amount_in(
+    def get_redeem_amount(
         self, 
         pool_state: Dict, 
         fixed_parameters: Dict,
         input_token: Token,
         output_token: Token,
-        output_amount: int
-    ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate required input amount given output amount
-        pass
+        input_amount: int
+    ) -> Decimal:
+        """
+        Redeem shares from the pool and receive underlying asset in return.
+        Returns the amount of underlying asset received in Ether denomination.
+        """
+
+        # amount of shares to redeem in wei
+        sharesToRedeem = input_amount
+
+        # amount of underlying asset to receive
+        amountOut = self._convert_to_assets(pool_state, fixed_parameters, sharesToRedeem)
+
+        return self._wei_to_ether(amountOut)
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
