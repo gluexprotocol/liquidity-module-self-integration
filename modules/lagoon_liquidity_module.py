@@ -5,7 +5,7 @@ import math
 
 ETHER = Decimal("1e18")
 
-class MyProtocolLiquidityModule(LiquidityModule):
+class LagoonLiquidityModule(LiquidityModule):
     def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
