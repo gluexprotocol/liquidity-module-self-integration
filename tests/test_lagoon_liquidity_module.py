@@ -63,37 +63,57 @@ def output_token(request):
 
 @pytest.mark.parametrize("input_amount", [1 * 10**18, 0, -1 * 10**18, 10**30])
 def test_get_deposit_amount(lagoon_module, pool_state, fixed_parameters, input_token, output_token, input_amount):
-    try:
-        shares = lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
+    should_raise = (
+        pool_state["totalAssets"] == 0 or
+        pool_state["totalSupply"] == 0 or
+        pool_state["daysStarted"] == 0 or
+        input_amount < 0
+    )
+    if should_raise:
+        with pytest.raises(Exception):
+            lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
+    else:
+        fee, shares = lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
+        assert fee is None
         assert isinstance(shares, (Decimal, int))
-        if pool_state["totalAssets"] > 0 and pool_state["totalSupply"] > 0 and input_amount > 0:
-            assert shares > 0
+        if input_amount == 0:
+            assert shares == 0
         else:
-            assert shares >= 0
-    except Exception:
-        assert pool_state["totalAssets"] == 0 or pool_state["totalSupply"] == 0 or pool_state["daysStarted"] == 0 or input_amount < 0
+            assert shares > 0
 
 @pytest.mark.parametrize("input_amount", [1 * 10**18, 0, -1 * 10**18, 10**30])
 def test_get_redeem_amount(lagoon_module, pool_state, fixed_parameters, input_token, output_token, input_amount):
-    try:
-        assets = lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
+    should_raise = (
+        pool_state["totalAssets"] == 0 or
+        pool_state["totalSupply"] == 0 or
+        pool_state["daysStarted"] == 0 or
+        input_amount < 0
+    )
+    if should_raise:
+        with pytest.raises(Exception):
+            lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
+    else:
+        fee, assets = lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
+        assert fee is None
         assert isinstance(assets, Decimal)
         assert assets >= 0
-    except Exception:
-        assert pool_state["totalAssets"] == 0 or pool_state["totalSupply"] == 0 or pool_state["daysStarted"] == 0 or input_amount < 0
 
 def test_get_apy(lagoon_module, pool_state):
-    try:
+    should_raise = pool_state["daysStarted"] == 0 or pool_state["totalSupply"] == 0
+    if should_raise:
+        with pytest.raises(Exception):
+            lagoon_module.get_apy(pool_state)
+    else:
         apy = lagoon_module.get_apy(pool_state)
         assert isinstance(apy, Decimal)
-        assert apy >= 0 or pool_state["daysStarted"] == 0 or pool_state["totalSupply"] == 0
-    except Exception:
-        assert pool_state["daysStarted"] == 0 or pool_state["totalSupply"] == 0
+        assert apy >= 0
 
 def test_get_tvl(lagoon_module, pool_state, input_token):
-    try:
+    should_raise = pool_state["totalSupply"] == 0 or input_token.reference_price <= 0
+    if should_raise:
+        with pytest.raises(Exception):
+            lagoon_module.get_tvl(pool_state, input_token)
+    else:
         tvl = lagoon_module.get_tvl(pool_state, input_token)
         assert isinstance(tvl, Decimal)
         assert tvl >= 0
-    except Exception:
-        assert pool_state["totalSupply"] == 0 or input_token.reference_price <= 0
