@@ -13,6 +13,13 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
+    def _convert_to_shares(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int: 
+        totalAssets = pool_state["totalAssets"]
+        totalSupply = pool_state["totalSupply"]
+        decimals = fixed_parameters["decimals"]
+
+        return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
+
     def _wei_to_ether(self, amount: int) -> Decimal:
         return Decimal(amount) / ETHER
 
@@ -23,11 +30,17 @@ class MyProtocolLiquidityModule(LiquidityModule):
         input_token: Token, 
         output_token: Token,
         input_amount: int, 
-    ) -> tuple[int | None, int | None]:
+    ) -> Decimal:
         """
         Deposit underlying asset into the pool and receive shares in return.
         """
-        sharePrice = pool_states["sharePrice"]
+        # amount of underlying asset to deposit in wei
+        amountIn = input_amount
+
+        # amount of shares to receive
+        sharesToMint = self._convert_to_shares(pool_states, fixed_parameters, amountIn)
+
+        return sharesToMint
 
     def get_redeem_amount(
         self, 
@@ -41,7 +54,6 @@ class MyProtocolLiquidityModule(LiquidityModule):
         Redeem shares from the pool and receive underlying asset in return.
         Returns the amount of underlying asset received in Ether denomination.
         """
-
         # amount of shares to redeem in wei
         sharesToRedeem = input_amount
 
