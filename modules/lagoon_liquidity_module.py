@@ -33,6 +33,7 @@ class MyProtocolLiquidityModule(LiquidityModule):
     ) -> Decimal:
         """
         Deposit underlying asset into the pool and receive shares in return.
+        Returns the amount of shares received in Ether denomination.
         """
         # amount of underlying asset to deposit in wei
         amountIn = input_amount
