@@ -23,7 +23,7 @@ class LagoonLiquidityModule(LiquidityModule):
     def _wei_to_ether(self, amount: int) -> Decimal:
         return Decimal(amount) / ETHER
 
-    def get_deposit_amount(
+    def get_amount_in(
         self, 
         pool_states: Dict, 
         fixed_parameters: Dict,
@@ -43,7 +43,7 @@ class LagoonLiquidityModule(LiquidityModule):
 
         return sharesToMint
 
-    def get_redeem_amount(
+    def get_amount_out(
         self, 
         pool_state: Dict, 
         fixed_parameters: Dict,
@@ -67,15 +67,15 @@ class LagoonLiquidityModule(LiquidityModule):
         """
         APY is in percentage
         """
-        
         # Retrieved from convertToAssets(uint256) of 1 ether
-        sharePrice = pool_state["sharePrice"]
+        sharePrice = Decimal(pool_state["sharePrice"])
         # total underlying asset supply
-        totalSupply = pool_state["totalSupply"]
+        totalSupply = Decimal(pool_state["totalSupply"])
         # days since the start of the pool
-        daysStarted = pool_state["daysStarted"]
+        daysStarted = Decimal(pool_state["daysStarted"])
 
-        return (sharePrice / totalSupply) / ETHER * (365 / daysStarted) * 100
+        # Use Decimal for all math to avoid float/Decimal errors
+        return (sharePrice / totalSupply) / ETHER * (Decimal(365) / daysStarted) * Decimal(100)
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
@@ -85,4 +85,4 @@ class LagoonLiquidityModule(LiquidityModule):
         # total underlying asset supply
         totalSupply = pool_state["totalSupply"]
 
-        return totalSupply * token.reference_price
+        return Decimal(totalSupply * token.reference_price)
