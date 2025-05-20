@@ -12,45 +12,53 @@ def lagoon_module():
     {
         "totalAssets": 10_000 * 10**18,
         "totalSupply": 5_000 * 10**18,
-        "sharePrice": 2 * 10**18,
-        "daysStarted": 100,
-        "shareTokenAddress": "0x1",
+        "currentSharePrice": 2 * 10**18,
+        "originSharePrice": 1 * 10**18,
+        "days": 100,
+        "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
+        "tvl": Decimal("100000.0"),
     },
     # Edge: zero supply/assets
     {
         "totalAssets": 0,
         "totalSupply": 0,
-        "sharePrice": 0,
-        "daysStarted": 1,
-        "shareTokenAddress": "0x1",
+        "currentSharePrice": 0,
+        "originSharePrice": 0,
+        "days": 1,
+        "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
+        "tvl": Decimal("0.0"),
     },
     # Edge: large values
     {
         "totalAssets": 10**30,
         "totalSupply": 10**30,
-        "sharePrice": 10**30,
-        "daysStarted": 365,
-        "shareTokenAddress": "0x1",
+        "currentSharePrice": 10**30,
+        "originSharePrice": 10**29,
+        "days": 365,
+        "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
+        "tvl": Decimal("1e30"),
     },
-    # Edge: daysStarted = 0 (should handle division by zero)
+    # Edge: days = 0 (should handle division by zero)
     {
         "totalAssets": 10_000 * 10**18,
         "totalSupply": 5_000 * 10**18,
-        "sharePrice": 2 * 10**18,
-        "daysStarted": 0,
-        "shareTokenAddress": "0x1",
+        "currentSharePrice": 2 * 10**18,
+        "originSharePrice": 1 * 10**18,
+        "days": 0,
+        "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
+        "tvl": Decimal("100000.0"),
     },
 ])
 def pool_state(request):
     return request.param
 
 @pytest.fixture(params=[
-    {"decimals": 18, "shareTokenAddress": "0x1", "underlyingTokenAddress": "0x0"},
-    {"decimals": 6, "shareTokenAddress": "0x3", "underlyingTokenAddress": "0x2"},
+    {"decimals": 18, "vaultContractAddress": "0x1", "underlyingTokenAddress": "0x0"},
+    {"decimals": 6, "vaultContractAddress": "0x3", "underlyingTokenAddress": "0x2"},
 ])
 def fixed_parameters(request):
     return request.param
@@ -75,7 +83,7 @@ def test_get_deposit_amount(lagoon_module, pool_state, fixed_parameters, asset_t
     should_raise = (
         pool_state["totalAssets"] == 0 or
         pool_state["totalSupply"] == 0 or
-        pool_state["daysStarted"] == 0 or
+        pool_state["days"] == 0 or
         input_amount < 0 or
         not valid_input
     )
@@ -85,16 +93,16 @@ def test_get_deposit_amount(lagoon_module, pool_state, fixed_parameters, asset_t
     else:
         fee, shares = lagoon_module.get_amount_out(pool_state, fixed_parameters, asset_token, share_token, input_amount)
         assert fee is None
-        assert isinstance(shares, (Decimal, int))
+        assert isinstance(shares, Decimal)
         assert shares >= 0
 
 @pytest.mark.parametrize("input_amount", [1 * 10**18, 0, -1 * 10**18, 10**30])
 def test_get_redeem_amount(lagoon_module, pool_state, fixed_parameters, share_token, asset_token, input_amount):
-    valid_input = share_token.address == fixed_parameters["shareTokenAddress"]
+    valid_input = share_token.address == fixed_parameters["vaultContractAddress"]
     should_raise = (
         pool_state["totalAssets"] == 0 or
         pool_state["totalSupply"] == 0 or
-        pool_state["daysStarted"] == 0 or
+        pool_state["days"] == 0 or
         input_amount < 0 or
         not valid_input
     )
@@ -108,7 +116,7 @@ def test_get_redeem_amount(lagoon_module, pool_state, fixed_parameters, share_to
         assert assets >= 0
 
 def test_get_apy(lagoon_module, pool_state):
-    should_raise = pool_state["daysStarted"] == 0 or pool_state["totalSupply"] == 0
+    should_raise = pool_state["days"] == 0
     if should_raise:
         with pytest.raises(Exception):
             lagoon_module.get_apy(pool_state)
@@ -117,12 +125,7 @@ def test_get_apy(lagoon_module, pool_state):
         assert isinstance(apy, Decimal)
         assert apy >= 0
 
-def test_get_tvl(lagoon_module, pool_state, asset_token):
-    should_raise = pool_state["totalSupply"] == 0 or asset_token.reference_price <= 0
-    if should_raise:
-        with pytest.raises(Exception):
-            lagoon_module.get_tvl(pool_state, asset_token)
-    else:
-        tvl = lagoon_module.get_tvl(pool_state, asset_token)
-        assert isinstance(tvl, Decimal)
-        assert tvl >= 0
+def test_get_tvl(lagoon_module, pool_state):
+    tvl = lagoon_module.get_tvl(pool_state)
+    assert isinstance(tvl, (Decimal, int, float))
+    assert tvl >= 0
