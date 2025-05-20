@@ -71,16 +71,16 @@ class YoProtocolLiquidityModule(LiquidityModule):
         Returns the amount of underlying asset received from input_amount of shares in Ether denomination. (using OZ ERC4626 convertToShares function)
         """
         
-        output_amount = 0
+        input_amount = 0
 
         if input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            output_amount = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
+            input_amount = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
         elif input_token.address == fixed_parameters["sharesTokenAddress"]:
-            output_amount = self._convert_to_assets(pool_state, fixed_parameters, output_amount)
+            input_amount = self._convert_to_assets(pool_state, fixed_parameters, output_amount)
         else:
             raise ValueError("Invalid token address. Must be either underlyingTokenAddress or sharesTokenAddress.")
         
-        return (output_amount, None)
+        return (input_amount, None)
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
