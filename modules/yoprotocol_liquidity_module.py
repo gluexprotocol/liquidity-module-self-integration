@@ -91,7 +91,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         originSharePrice = Decimal(pool_state['originSharePrice'])
         days = Decimal(pool_state['days'])
 
-        return (currentSharePrice - originSharePrice) / Constant.ETHER / days * Decimal(365) * Decimal(100)
+        return self._wei_to_ether(currentSharePrice - originSharePrice) / days * Decimal(100)
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
