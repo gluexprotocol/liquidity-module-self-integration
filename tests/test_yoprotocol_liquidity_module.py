@@ -48,7 +48,7 @@ def zero_pool_state():
 @pytest.fixture
 def sample_fixed_parameters():
     return {
-        "decimals": 18,
+        "shareTokenDecimals": 18,
         "underlyingTokenAddress": Constant.OPTIMISM_WETH,
         "sharesTokenAddress": "0xSHARES"
     }
