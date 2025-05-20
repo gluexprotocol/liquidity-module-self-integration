@@ -71,9 +71,9 @@ def test_get_deposit_amount(lagoon_module, pool_state, fixed_parameters, input_t
     )
     if should_raise:
         with pytest.raises(Exception):
-            lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
+            lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
     else:
-        fee, shares = lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
+        fee, shares = lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
         assert fee is None
         assert isinstance(shares, (Decimal, int))
         if input_amount == 0:
@@ -91,9 +91,9 @@ def test_get_redeem_amount(lagoon_module, pool_state, fixed_parameters, input_to
     )
     if should_raise:
         with pytest.raises(Exception):
-            lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
+            lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
     else:
-        fee, assets = lagoon_module.get_amount_out(pool_state, fixed_parameters, input_token, output_token, input_amount)
+        fee, assets = lagoon_module.get_amount_in(pool_state, fixed_parameters, input_token, output_token, input_amount)
         assert fee is None
         assert isinstance(assets, Decimal)
         assert assets >= 0

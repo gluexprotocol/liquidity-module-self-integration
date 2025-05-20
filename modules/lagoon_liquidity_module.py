@@ -27,7 +27,7 @@ class LagoonLiquidityModule(LiquidityModule):
     def _wei_to_ether(self, amount: int) -> Decimal:
         return Decimal(amount) / ETHER
 
-    def get_amount_in(
+    def get_amount_out(
         self,
         pool_state: Dict,
         fixed_parameters: Dict,
@@ -51,7 +51,7 @@ class LagoonLiquidityModule(LiquidityModule):
         sharesToMint = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
         return (None, sharesToMint)
 
-    def get_amount_out(
+    def get_amount_in(
         self,
         pool_state: Dict,
         fixed_parameters: Dict,
