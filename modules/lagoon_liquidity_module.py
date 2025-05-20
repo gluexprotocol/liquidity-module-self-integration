@@ -7,25 +7,25 @@ class Constants:
     ETHER = Decimal("1e18")
 
 class LagoonLiquidityModule(LiquidityModule):
-    def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
+    def _convert_to_assets(self, pool_state: Dict, shareToken: Token, amount: int) -> int:
         """
         Convert a given amount of shares to the equivalent amount of underlying assets using the pool state and fixed parameters.
         Formula: floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = fixed_parameters["decimals"]
+        decimals = shareToken.decimals
         
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
-    def _convert_to_shares(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
+    def _convert_to_shares(self, pool_state: Dict, shareToken: Token, amount: int) -> int:
         """
         Convert a given amount of underlying assets to the equivalent amount of shares using the pool state and fixed parameters.
         Formula: floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = fixed_parameters["decimals"]
+        decimals = shareToken.decimals
         
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
