@@ -88,10 +88,10 @@ class YoProtocolLiquidityModule(LiquidityModule):
         """
 
         currentSharePrice = Decimal(pool_state['currentSharePrice'])
-        firstSharePrice = Decimal(pool_state['firstSharePrice'])
-        uptimeDays = Decimal(pool_state['uptimeDays'])
+        originSharePrice = Decimal(pool_state['originSharePrice'])
+        days = Decimal(pool_state['days'])
 
-        return (currentSharePrice - firstSharePrice) / Constant.ETHER / uptimeDays * Decimal(365) * Decimal(100)
+        return (currentSharePrice - originSharePrice) / Constant.ETHER / days * Decimal(365) * Decimal(100)
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
