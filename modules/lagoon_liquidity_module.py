@@ -8,6 +8,10 @@ class Constants:
 
 class LagoonLiquidityModule(LiquidityModule):
     def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
+        """
+        Convert a given amount of shares to the equivalent amount of underlying assets using the pool state and fixed parameters.
+        Formula: floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
+        """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
         decimals = fixed_parameters["decimals"]
@@ -15,6 +19,10 @@ class LagoonLiquidityModule(LiquidityModule):
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
     def _convert_to_shares(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
+        """
+        Convert a given amount of underlying assets to the equivalent amount of shares using the pool state and fixed parameters.
+        Formula: floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
+        """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
         decimals = fixed_parameters["decimals"]
@@ -22,6 +30,9 @@ class LagoonLiquidityModule(LiquidityModule):
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
     def _wei_to_ether(self, amount: int) -> Decimal:
+        """
+        Convert a value from Wei to Ether denomination using the constant ETHER.
+        """
         return Decimal(amount) / Constants.ETHER
 
     def get_amount_out(
@@ -33,9 +44,8 @@ class LagoonLiquidityModule(LiquidityModule):
         output_amount: int
     ) -> Tuple[None, int]:
         """
-        Deposit underlying asset into the pool and receive shares in return.
-        Returns a tuple (fee, shares received). Fee is None for this module.
-        Raises Exception for invalid pool state or negative output amount.
+        Given an output amount (in shares or assets), calculate the required input amount (in the other token),
+        depending on the input token address. Returns a tuple (fee, amount in Ether denomination).
         """
         # Input validation
         if (
@@ -65,9 +75,8 @@ class LagoonLiquidityModule(LiquidityModule):
         input_amount: int
     ) -> Tuple[None, Decimal]:
         """
-        Redeem shares from the pool and receive underlying asset in return.
-        Returns a tuple (fee, assets received in Ether denomination). Fee is None for this module.
-        Raises Exception for invalid pool state or negative input amount.
+        Given an input amount (in shares or assets), calculate the output amount (in the other token),
+        depending on the input token address. Returns a tuple (fee, amount in Ether denomination).
         """
         if (
             pool_state["totalAssets"] == 0 or
@@ -89,8 +98,8 @@ class LagoonLiquidityModule(LiquidityModule):
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
-        Calculate APY (Annual Percentage Yield) as a percentage.
-        Raises Exception if daysStarted or totalSupply is zero.
+        Calculate APY (Annual Percentage Yield) as a percentage using the formula:
+        (sharePrice / totalSupply) / ETHER * (365 / daysStarted) * 100
         """
         sharePrice = Decimal(pool_state["sharePrice"])
         totalSupply = Decimal(pool_state["totalSupply"])
@@ -102,8 +111,8 @@ class LagoonLiquidityModule(LiquidityModule):
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
-        Calculate TVL (Total Value Locked) in native chain currency.
-        Raises Exception if totalSupply is zero, token is None, or token.reference_price is not positive.
+        Calculate TVL (Total Value Locked) as totalSupply multiplied by the underlying asset token's
+        reference price in terms of native gas token.
         """
         totalSupply = pool_state["totalSupply"]
         if totalSupply == 0 or (token and token.reference_price <= 0):
