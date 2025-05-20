@@ -57,8 +57,8 @@ def pool_state(request):
     return request.param
 
 @pytest.fixture(params=[
-    {"decimals": 18, "vaultContractAddress": "0x1", "underlyingTokenAddress": "0x0"},
-    {"decimals": 6, "vaultContractAddress": "0x3", "underlyingTokenAddress": "0x2"},
+    {"shareTokenDecimals": 18, "vaultContractAddress": "0x1", "underlyingTokenAddress": "0x0"},
+    {"shareTokenDecimals": 6, "vaultContractAddress": "0x3", "underlyingTokenAddress": "0x2"},
 ])
 def fixed_parameters(request):
     return request.param

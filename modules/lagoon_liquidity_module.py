@@ -7,7 +7,7 @@ class Constants:
     ETHER = Decimal("1e18")
 
 class LagoonLiquidityModule(LiquidityModule):
-    def _convert_to_assets(self, pool_state: Dict, shareToken: Token, amount: int) -> int:
+    def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
         """
         Convert a given amount of shares to the equivalent amount of underlying assets.
         Uses the pool state and share token decimals.
@@ -21,11 +21,11 @@ class LagoonLiquidityModule(LiquidityModule):
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = shareToken.decimals
+        decimals = fixed_parameters["shareTokenDecimals"]
         
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
-    def _convert_to_shares(self, pool_state: Dict, shareToken: Token, amount: int) -> int:
+    def _convert_to_shares(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
         """
         Convert a given amount of underlying assets to the equivalent amount of shares.
         Uses the pool state and share token decimals.
@@ -39,7 +39,7 @@ class LagoonLiquidityModule(LiquidityModule):
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = shareToken.decimals
+        decimals = fixed_parameters["shareTokenDecimals"]
         
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
@@ -86,9 +86,9 @@ class LagoonLiquidityModule(LiquidityModule):
         
         input_amount = 0
         if input_token.address == fixed_parameters["vaultContractAddress"]:
-            input_amount = self._convert_to_assets(pool_state, input_token, output_amount)
+            input_amount = self._convert_to_assets(pool_state, fixed_parameters, output_amount)
         elif input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            input_amount = self._convert_to_shares(pool_state, input_token, output_amount)
+            input_amount = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
         else:
             raise Exception("Invalid input token address")
         
@@ -126,9 +126,9 @@ class LagoonLiquidityModule(LiquidityModule):
         output_amount = 0
 
         if input_token.address == fixed_parameters["vaultContractAddress"]:
-            output_amount = self._convert_to_assets(pool_state, input_token, input_amount)
+            output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
         elif input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            output_amount = self._convert_to_shares(pool_state, input_token, input_amount)
+            output_amount = self._convert_to_shares(pool_state, fixed_parameters, input_amount)
         else:
             raise Exception("Invalid input token address")
 
