@@ -101,13 +101,14 @@ class LagoonLiquidityModule(LiquidityModule):
         Calculate APY (Annual Percentage Yield) as a percentage using the formula:
         (sharePrice / totalSupply) / ETHER * (365 / daysStarted) * 100
         """
-        sharePrice = Decimal(pool_state["sharePrice"])
-        totalSupply = Decimal(pool_state["totalSupply"])
-        daysStarted = Decimal(pool_state["daysStarted"])
-        if daysStarted == 0 or totalSupply == 0:
+        currentSharePrice = Decimal(pool_state["currentSharePrice"])
+        originSharePrice = Decimal(pool_state["originSharePrice"])
+        days = Decimal(pool_state["days"])
+        
+        if days == 0:
             raise Exception("Invalid pool state for APY calculation")
-        # APY formula: (sharePrice / totalSupply) / ETHER * (365 / daysStarted) * 100
-        return (sharePrice / totalSupply) / Constants.ETHER * (Decimal(365) / daysStarted) * Decimal(100)
+        
+        return (currentSharePrice - originSharePrice) / Constants.ETHER / days * Decimal(100)
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
