@@ -115,9 +115,5 @@ class LagoonLiquidityModule(LiquidityModule):
         Calculate TVL (Total Value Locked) as totalSupply multiplied by the underlying asset token's
         reference price in terms of native gas token.
         """
-        totalSupply = pool_state["totalSupply"]
-        if totalSupply == 0 or (token and token.reference_price <= 0):
-            raise Exception("Invalid pool state or token for TVL calculation")
-        if token is None:
-            raise Exception("Token must be provided for TVL calculation")
-        return Decimal(totalSupply) * Decimal(token.reference_price)
+        
+        return pool_state.get('tvl', 0)
