@@ -35,7 +35,7 @@ class LagoonLiquidityModule(LiquidityModule):
         """
         return Decimal(amount) / Constants.ETHER
 
-    def get_amount_out(
+    def get_amount_in(
         self,
         pool_state: Dict,
         fixed_parameters: Dict,
@@ -56,17 +56,17 @@ class LagoonLiquidityModule(LiquidityModule):
         ):
             raise Exception("Invalid pool state or output amount")
         
-        output_amount = 0
-        if input_token.address == fixed_parameters["shareTokenAddress"]:
-            output_amount = self._convert_to_assets(pool_state, fixed_parameters, output_amount)
+        input_amount = 0
+        if input_token.address == fixed_parameters["vaultContractAddress"]:
+            input_amount = self._convert_to_assets(pool_state, input_token, output_amount)
         elif input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            output_amount = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
+            input_amount = self._convert_to_shares(pool_state, input_token, output_amount)
         else:
             raise Exception("Invalid input token address")
         
-        return (None, self._wei_to_ether(output_amount))
+        return (None, self._wei_to_ether(input_amount))
 
-    def get_amount_in(
+    def get_amount_out(
         self,
         pool_state: Dict,
         fixed_parameters: Dict,
@@ -87,10 +87,10 @@ class LagoonLiquidityModule(LiquidityModule):
             raise Exception("Invalid pool state or input amount")
         output_amount = 0
 
-        if input_token.address == fixed_parameters["shareTokenAddress"]:
-            output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
+        if input_token.address == fixed_parameters["vaultContractAddress"]:
+            output_amount = self._convert_to_assets(pool_state, input_token, input_amount)
         elif input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            output_amount = self._convert_to_shares(pool_state, fixed_parameters, input_amount)
+            output_amount = self._convert_to_shares(pool_state, input_token, input_amount)
         else:
             raise Exception("Invalid input token address")
 
