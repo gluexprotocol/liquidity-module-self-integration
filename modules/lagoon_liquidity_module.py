@@ -3,29 +3,26 @@ from typing import Dict, Optional, Tuple
 from decimal import Decimal
 import math
 
-# Constants
-ETHER = Decimal("1e18")
+class Constants:
+    ETHER = Decimal("1e18")
 
 class LagoonLiquidityModule(LiquidityModule):
-    # Convert shares to assets using pool state and fixed parameters
     def _convert_to_assets(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
         decimals = fixed_parameters["decimals"]
-        # Add 1 to avoid division by zero, add 10**decimals to denominator for precision
+        
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
-    # Convert assets to shares using pool state and fixed parameters
     def _convert_to_shares(self, pool_state: Dict, fixed_parameters: Dict, amount: int) -> int:
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
         decimals = fixed_parameters["decimals"]
-        # Add 1 to avoid division by zero, add 10**decimals to numerator for precision
+        
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
-    # Convert wei to ether (Decimal)
     def _wei_to_ether(self, amount: int) -> Decimal:
-        return Decimal(amount) / ETHER
+        return Decimal(amount) / Constants.ETHER
 
     def get_amount_out(
         self,
@@ -48,8 +45,16 @@ class LagoonLiquidityModule(LiquidityModule):
             output_amount < 0
         ):
             raise Exception("Invalid pool state or output amount")
-        sharesToMint = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
-        return (None, sharesToMint)
+        
+        output_amount = 0
+        if input_token.address == pool_state["shareTokenAddress"]:
+            output_amount = self._convert_to_assets(pool_state, fixed_parameters, output_amount)
+        elif input_token.address == pool_state["underlyingTokenAddress"]:
+            output_amount = self._convert_to_shares(pool_state, fixed_parameters, output_amount)
+        else:
+            raise Exception("Invalid input token address")
+        
+        return (None, self._wei_to_ether(output_amount))
 
     def get_amount_in(
         self,
@@ -71,8 +76,16 @@ class LagoonLiquidityModule(LiquidityModule):
             input_amount < 0
         ):
             raise Exception("Invalid pool state or input amount")
-        amountOut = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
-        return (None, self._wei_to_ether(amountOut))
+        output_amount = 0
+
+        if input_token.address == pool_state["shareTokenAddress"]:
+            output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
+        elif input_token.address == pool_state["underlyingTokenAddress"]:
+            output_amount = self._convert_to_shares(pool_state, fixed_parameters, input_amount)
+        else:
+            raise Exception("Invalid input token address")
+
+        return (None, self._wei_to_ether(output_amount))
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
@@ -85,7 +98,7 @@ class LagoonLiquidityModule(LiquidityModule):
         if daysStarted == 0 or totalSupply == 0:
             raise Exception("Invalid pool state for APY calculation")
         # APY formula: (sharePrice / totalSupply) / ETHER * (365 / daysStarted) * 100
-        return (sharePrice / totalSupply) / ETHER * (Decimal(365) / daysStarted) * Decimal(100)
+        return (sharePrice / totalSupply) / Constants.ETHER * (Decimal(365) / daysStarted) * Decimal(100)
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
