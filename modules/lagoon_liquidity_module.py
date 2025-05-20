@@ -79,7 +79,7 @@ class LagoonLiquidityModule(LiquidityModule):
         if (
             pool_state["totalAssets"] == 0 or
             pool_state["totalSupply"] == 0 or
-            pool_state["daysStarted"] == 0 or
+            pool_state["days"] == 0 or
             output_amount < 0
         ):
             raise Exception("Invalid pool state or output amount")
@@ -119,7 +119,7 @@ class LagoonLiquidityModule(LiquidityModule):
         if (
             pool_state["totalAssets"] == 0 or
             pool_state["totalSupply"] == 0 or
-            pool_state["daysStarted"] == 0 or
+            pool_state["days"] == 0 or
             input_amount < 0
         ):
             raise Exception("Invalid pool state or input amount")
