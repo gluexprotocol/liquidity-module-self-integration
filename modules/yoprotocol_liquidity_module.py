@@ -57,7 +57,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         else:
             raise ValueError("Invalid token address. Must be either underlyingTokenAddress or sharesTokenAddress.")
         
-        return (output_amount, None)
+        return (None, output_amount)
 
     def get_amount_in(
         self, 
@@ -80,7 +80,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         else:
             raise ValueError("Invalid token address. Must be either underlyingTokenAddress or sharesTokenAddress.")
         
-        return (input_amount, None)
+        return (None, input_amount)
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
