@@ -51,9 +51,9 @@ class YoProtocolLiquidityModule(LiquidityModule):
         output_amount = 0
 
         if input_token.address == fixed_parameters["underlyingTokenAddress"]:
-            output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
-        elif input_token.address == fixed_parameters["sharesTokenAddress"]:
             output_amount = self._convert_to_shares(pool_state, fixed_parameters, input_amount)
+        elif input_token.address == fixed_parameters["sharesTokenAddress"]:
+            output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
         else:
             raise ValueError("Invalid token address. Must be either underlyingTokenAddress or sharesTokenAddress.")
         
