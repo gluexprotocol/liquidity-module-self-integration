@@ -15,7 +15,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = fixed_parameters["decimals"]
+        decimals = fixed_parameters["shareTokenDecimals"]
 
         return math.floor(amount * (totalAssets + 1) / (totalSupply + 10 ** decimals))
 
@@ -26,7 +26,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         """
         totalAssets = pool_state["totalAssets"]
         totalSupply = pool_state["totalSupply"]
-        decimals = fixed_parameters["decimals"]
+        decimals = fixed_parameters["shareTokenDecimals"]
 
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
