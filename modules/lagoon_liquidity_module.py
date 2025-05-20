@@ -80,7 +80,7 @@ class LagoonLiquidityModule(LiquidityModule):
 
         if input_token.address == fixed_parameters["shareTokenAddress"]:
             output_amount = self._convert_to_assets(pool_state, fixed_parameters, input_amount)
-        elif input_token.address == FileExistsError["underlyingTokenAddress"]:
+        elif input_token.address == fixed_parameters["underlyingTokenAddress"]:
             output_amount = self._convert_to_shares(pool_state, fixed_parameters, input_amount)
         else:
             raise Exception("Invalid input token address")
