@@ -95,19 +95,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
-        Returns the total value locked (TVL) in the pool in Ether denomination.
+        Returns the total value locked (TVL) in the protocol.
         """
         
-        totalAssets = Decimal(pool_state['totalAssets'])
-
-        if token.address != pool_state['underlyingTokenAddress']:
-            raise ValueError("Token address does not match the underlying token address in the pool state.")
-        
-        tvl = 0
-        
-        # write access is only on Base, and yoETH uses WETH as underlying token
-        if token.address == Constant.OPTIMISM_WETH:
-            tvl = totalAssets / Constant.ETHER
-        else:
-            tvl = totalAssets * token.reference_price / Constant.ETHER
-        return tvl
+        return pool_state.get('tvl', 0)
