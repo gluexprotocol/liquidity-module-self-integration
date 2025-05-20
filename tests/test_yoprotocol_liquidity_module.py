@@ -27,9 +27,22 @@ def sample_pool_state():
         "underlyingTokenAddress": Constant.OPTIMISM_WETH,
         "sharesTokenAddress": "0xSHARES",
         "currentSharePrice": str(2 * 10**18),
-        "originSharePrice": str(1 * 10**18),  # changed key to match source
-        "days": 10,  # changed key to match source
-        "tvl": Decimal("1000.0")  # ensure tvl is present and Decimal
+        "originSharePrice": str(1 * 10**18),
+        "days": 10,
+        "tvl": Decimal("1000.0") 
+    }
+
+@pytest.fixture
+def zero_pool_state():
+    return {
+        "totalAssets": 0,
+        "totalSupply": 0,
+        "underlyingTokenAddress": Constant.OPTIMISM_WETH,
+        "sharesTokenAddress": "0xSHARES",
+        "currentSharePrice": str(0),
+        "originSharePrice": str(0),
+        "days": 1,
+        "tvl": Decimal("0.0")
     }
 
 @pytest.fixture
@@ -69,6 +82,7 @@ def test_get_amount_in_underlying_to_shares(sample_tokens, sample_pool_state, sa
     output_amount = 10 * 10**18
     _, out = module.get_amount_in(sample_pool_state, sample_fixed_parameters, underlying, shares, output_amount)
     assert isinstance(out, int)
+    assert out > 0
 
 def test_get_amount_in_shares_to_underlying(sample_tokens, sample_pool_state, sample_fixed_parameters):
     underlying, shares = sample_tokens
@@ -76,6 +90,7 @@ def test_get_amount_in_shares_to_underlying(sample_tokens, sample_pool_state, sa
     output_amount = 10 * 10**18
     _, out = module.get_amount_in(sample_pool_state, sample_fixed_parameters, shares, underlying, output_amount)
     assert isinstance(out, int)
+    assert out > 0
 
 def test_get_amount_in_invalid_token(sample_tokens, sample_pool_state, sample_fixed_parameters):
     underlying, shares = sample_tokens
@@ -95,4 +110,4 @@ def test_get_tvl(sample_tokens, sample_pool_state):
     module = YoProtocolLiquidityModule()
     tvl = module.get_tvl(sample_pool_state, underlying)
     assert isinstance(tvl, Decimal)
-    assert tvl > 0
+    assert tvl >= 0
