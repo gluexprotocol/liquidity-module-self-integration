@@ -34,7 +34,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
         """
         Convert a value from Wei to Ether denomination using the constant ETHER.
         """
-        return Decimal(amount) / Constant.ETHER  # Fix typo in Constant
+        return Decimal(amount) / Constant.ETHER
 
     def get_amount_out(
         self, 
