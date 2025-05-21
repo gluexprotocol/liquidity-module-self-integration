@@ -110,7 +110,6 @@ class MyProtocolLiquidityModule(LiquidityModule):
 ### 3. Test Your Integration
 
 - Run the provided test suite (`tests/test_liquidity_module.py`) to ensure compatibility.
-- Use the GlueX Self-Integration Sandbox to simulate transactions and verify execution.
 
 ```bash
 pytest tests/
