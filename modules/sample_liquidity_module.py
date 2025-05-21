@@ -102,6 +102,35 @@ class MyProtocolLiquidityModule(LiquidityModule):
         amount = amount_in
 
         return fee, amount
+    def get_tvl(self, pool_state: Dict, input_token: Token, output_token: Token) -> float:
+        # Implement TVL calculation logic
+        reserve0 = pool_state.get('reserve0', 0)
+        reserve1 = pool_state.get('reserve1', 0)
+        
+        token0_decimals = input_token.decimals
+        token1_decimals = output_token.decimals
+        rprice0 = input_token.reference_price
+        rprice1 = output_token.reference_price
+
+        # Adjust for the difference in reference price scaling
+        d1 = 18 - token0_decimals
+        d2 = 18 - token1_decimals
+
+        # Normalize prices based on decimals
+        price0 = rprice0 / (10 ** d1)
+        price1 = rprice1 / (10 ** d2)
+
+        if price0 == 0 or price1 == 0:
+            return 0
+
+        adjusted_reserve0 = reserve0 / (10 ** token0_decimals)
+        adjusted_reserve1 = reserve1 / (10 ** token1_decimals)
+
+        reserve0 = adjusted_reserve0 * price0
+        reserve1 = adjusted_reserve1 * price1
+
+        tvl = reserve0 + reserve1
+        return float(tvl)
 
     # Calculates the Annual Percentage Yield (APY) for providing liquidity to the pool.
     # Uses a compound interest formula based on 24-hour fees and total value locked (TVL).
@@ -112,31 +141,67 @@ class MyProtocolLiquidityModule(LiquidityModule):
         output_token: Token, 
         input_amount: int
     ) -> Decimal:
-        # Implement APY calculation logic
-        fees_24h = pool_state.get('fees_24h', 0)
-        current_tvl = pool_state.get('tvl', 0)
-        
-        # Add the input amount to the TVL before calculating APY
-        adjusted_tvl = current_tvl + input_amount
-        
-        # Calculate yield based on the adjusted TVL
-        daily_yield = fees_24h / adjusted_tvl if adjusted_tvl else 0
-        
-        # Calculate simple APY (no compounding)
-        apy_simple = daily_yield * 365
-        
-        # Calculate compounded APY
-        apy_compounded = (1 + daily_yield) ** 365 - 1
-        
-        return apy_compounded
-
-    # Calculates the Total Value Locked (TVL) in the pool by summing the reserves of both tokens.
-    def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
-        # Implement TVL calculation logic
+        # Get current reserves of the pool
         reserve0 = pool_state.get('reserve0', 0)
         reserve1 = pool_state.get('reserve1', 0)
 
-        return reserve0 + reserve1
+        token0_decimals = input_token.decimals
+        token1_decimals = output_token.decimals
+        rprice0 = input_token.reference_price
+        rprice1 = output_token.reference_price
+
+        # Adjust for the difference in reference price scaling
+        d1 = 18 - token0_decimals
+        d2 = 18 - token1_decimals
+
+        # Normalize prices based on decimals
+        price0 = rprice0 / (10 ** d1) if rprice0 else 0
+        price1 = rprice1 / (10 ** d2) if rprice1 else 0
+
+        # If price data is missing, return 0 APY
+        if price0 == 0 or price1 == 0:
+            return Decimal(0)
+
+        adjusted_reserve0 = reserve0 / (10 ** token0_decimals)
+        adjusted_reserve1 = reserve1 / (10 ** token1_decimals)
+
+        if input_token.address == pool_state.get("token0"):
+            adjusted_amount_in = input_amount / (10 ** token0_decimals)
+            reserve0 = adjusted_reserve0 + adjusted_amount_in
+            reserve1 = adjusted_reserve1
+        else:
+            adjusted_amount_in = input_amount / (10 ** token1_decimals)
+            reserve0 = adjusted_reserve0
+            reserve1 = adjusted_reserve1 + adjusted_amount_in
+
+        # Convert token reserves into value terms using price
+        reserve0_value = reserve0 * price0
+        reserve1_value = reserve1 * price1
+
+        tvl = reserve0_value + reserve1_value
+
+        fee_data = pool_state.get('fees_over_period', {})
+        fee_amount0 = fee_data.get('amount0', 0)
+        fee_amount1 = fee_data.get('amount1', 0)
+        days = fee_data.get('days', 0)
+
+        fee_amount0 = (fee_amount0 / (10 ** token0_decimals)) * price0
+        fee_amount1 = (fee_amount1 / (10 ** token1_decimals)) * price1
+
+        # Uniswap Charges 0.3% fee on swaps
+        total_fees_value = (fee_amount0 + fee_amount1) * Decimal("0.003")
+
+        if tvl == 0 or days == 0:
+            return Decimal(0)
+
+        # Calculate daily yield from total fees
+        daily_fees = total_fees_value / days
+        daily_rate = daily_fees / tvl
+
+        # Annualize the return using simple compounding approximation
+        apy = daily_rate * 365 * 100
+
+        return Decimal(apy)
 
     # Core AMM swap function that implements the constant product formula (x * y = k).
     # Can calculate either output amount given input, or input needed for desired output.
