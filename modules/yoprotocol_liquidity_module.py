@@ -96,7 +96,7 @@ class YoProtocolLiquidityModule(LiquidityModule):
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
         Returns the total value locked (TVL) in the protocol.
-        In terms of the underlying asset.
+        In terms of the underlying asset. In Ether.
         """
         
-        return Decimal(pool_state.get('totalAssets', 0))
+        return self._wei_to_ether(pool_state.get('totalAssets', 0))
