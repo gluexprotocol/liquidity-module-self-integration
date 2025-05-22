@@ -67,11 +67,20 @@ class LiquidityModule(ABC):
         pass
 
     @abstractmethod
-    def get_apy(self, pool_state: Dict) -> Decimal:
+    def get_apy(
+        self, 
+        pool_state: Dict, 
+        input_token: Token, 
+        output_token: Token, 
+        input_amount: int
+    ) -> Decimal:
         """
         Computes the annual percentage yield (APY) for liquidity providers, lenders, or other actors in the protocol.
-
+        
         :param pool_state: A dictionary representing the state of the liquidity pool.
+        :param input_token: The token being swapped in.
+        :param output_token: The token being swapped out.
+        :param input_amount: The amount of input_token being provided.
         :return: The APY as a decimal value (e.g., 0.05 for 5% APY).
         """
         pass
