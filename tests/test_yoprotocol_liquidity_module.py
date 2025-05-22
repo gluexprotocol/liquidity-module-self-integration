@@ -29,7 +29,6 @@ def sample_pool_state():
         "currentSharePrice": str(2 * 10**18),
         "originSharePrice": str(1 * 10**18),
         "days": 10,
-        "tvl": Decimal("1000.0") 
     }
 
 @pytest.fixture
@@ -42,7 +41,6 @@ def zero_pool_state():
         "currentSharePrice": str(0),
         "originSharePrice": str(0),
         "days": 1,
-        "tvl": Decimal("0.0")
     }
 
 @pytest.fixture
