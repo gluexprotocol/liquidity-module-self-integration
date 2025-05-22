@@ -17,7 +17,6 @@ def lagoon_module():
         "days": 100,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
-        "tvl": Decimal("100000.0"),
     },
     # Edge: zero supply/assets
     {
@@ -28,7 +27,6 @@ def lagoon_module():
         "days": 1,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
-        "tvl": Decimal("0.0"),
     },
     # Edge: large values
     {
@@ -39,7 +37,6 @@ def lagoon_module():
         "days": 365,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
-        "tvl": Decimal("1e30"),
     },
     # Edge: days = 0 (should handle division by zero)
     {
@@ -50,7 +47,6 @@ def lagoon_module():
         "days": 0,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
-        "tvl": Decimal("100000.0"),
     },
 ])
 def pool_state(request):
@@ -127,5 +123,5 @@ def test_get_apy(lagoon_module, pool_state):
 
 def test_get_tvl(lagoon_module, pool_state):
     tvl = lagoon_module.get_tvl(pool_state)
-    assert isinstance(tvl, (Decimal, int, float))
+    assert isinstance(tvl, (Decimal))
     assert tvl >= 0
