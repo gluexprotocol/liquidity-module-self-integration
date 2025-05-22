@@ -11,7 +11,9 @@ class TranchessYieldLiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int, 
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
+        """
+        Calculate the amount of output token received for a given input amount.
+        """
         pass
 
     def get_amount_in(
@@ -22,13 +24,19 @@ class TranchessYieldLiquidityModule(LiquidityModule):
         output_token: Token,
         output_amount: int
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate required input amount given output amount
+        """
+        Calculate the amount of input token required to receive a given output amount.
+        """
         pass
 
     def get_apy(self, pool_state: Dict) -> Decimal:
-        # Implement APY calculation logic
+        """
+        Calculate the annual percentage yield (APY) for a yield farm pool.
+        """
         pass
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
-        # Implement TVL calculation logic
+        """
+        Calculate the total value locked (TVL) in a yield farm pool.
+        """
         pass
