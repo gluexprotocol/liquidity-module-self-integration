@@ -102,106 +102,142 @@ class MyProtocolLiquidityModule(LiquidityModule):
         amount = amount_in
 
         return fee, amount
-    def get_tvl(self, pool_state: Dict, input_token: Token, output_token: Token) -> float:
-        # Implement TVL calculation logic
-        reserve0 = pool_state.get('reserve0', 0)
-        reserve1 = pool_state.get('reserve1', 0)
-        
-        token0_decimals = input_token.decimals
-        token1_decimals = output_token.decimals
-        rprice0 = input_token.reference_price
-        rprice1 = output_token.reference_price
-
-        # Adjust for the difference in reference price scaling
-        d1 = 18 - token0_decimals
-        d2 = 18 - token1_decimals
-
-        # Normalize prices based on decimals
-        price0 = rprice0 / (10 ** d1)
-        price1 = rprice1 / (10 ** d2)
-
-        if price0 == 0 or price1 == 0:
-            return 0
-
-        adjusted_reserve0 = reserve0 / (10 ** token0_decimals)
-        adjusted_reserve1 = reserve1 / (10 ** token1_decimals)
-
-        reserve0 = adjusted_reserve0 * price0
-        reserve1 = adjusted_reserve1 * price1
-
-        tvl = reserve0 + reserve1
-        return float(tvl)
-
-    # Calculates the Annual Percentage Yield (APY) for providing liquidity to the pool.
-    # Uses a compound interest formula based on 24-hour fees and total value locked (TVL).
-    def get_apy(
+    def get_tvl(
         self, 
         pool_state: Dict, 
-        input_token: Token, 
-        output_token: Token, 
-        input_amount: int
-    ) -> Decimal:
+        pool_tokens: Dict[Token.address, Token]
+    ) -> int:
+            '''
+            Method to obtain the TVL at an arbitrary liquidity pool in the 
+            protocol. 
+            
+            Inputs:
+            - pool_state -> Dictionary of liquidity pool data attainable via 
+                            RPC calls that are required to compute the pool's TVL.
+            - pool_tokens -> Dictionary of tokens relevant to the liquidity pool.
+            
+            NOTE: pool_tokens also contains the LP token.
+            NOTE: token.reference_price can be assumed to be the exchange
+                    rate between token.address and the native token of the 
+                    blockchain in which this liquidity pool exists.
+            
+            Returns:
+            TVL of the pool denominated in the lowest denomination of 
+            the native token.
+            '''
+            # Implement TVL calculation logic
+            reserve0 = pool_state.get('reserve0', 0)
+            reserve1 = pool_state.get('reserve1', 0)
+            
+            # Get tokens from pool_tokens dictionary
+            tokens = list(pool_tokens.values())
+            token0 = tokens[0]  
+            token1 = tokens[1]  
+            
+            rprice0 = token0.reference_price
+            rprice1 = token1.reference_price
+                
+                # Translate reserves into reference token amounts
+            rreserve0 = reserve0 * rprice0
+            rreserve1 = reserve1 * rprice1
+                
+                # Get TVL in refrence token
+            rtvl = rreserve0 + rreserve1
+            
+            return int(rtvl)
+
+# Calculates the Annual Percentage Yield (APY) for providing liquidity to the pool.
+# Uses a compound interest formula based on 24-hour fees and total value locked (TVL).
+    def get_apy(
+            self, 
+            pool_state: Dict, 
+            underlying_amount: int,
+            underlying_token: Token, 
+            pool_tokens: Dict[Token.address, Token]
+    ) -> int:
+            '''
+                    Method to obtain the diluted APY of an arbitrary liquidity pool in the 
+                    protocol. 
+                    
+                    Inputs:
+                    - pool_state -> Dictionary of liquidity pool data attainable via 
+                                    RPC calls that are required to compute the pool's diluted APY..
+                    - pool_tokens -> Dictionary of tokens relevant to the liquidity pool.
+                    
+                    NOTE: pool_tokens also contains the LP token.
+                    NOTE: token.reference_price can be assumed to be the exchange
+                        rate between token.address and the native token of the 
+                        blockchain in which this liquidity pool exists.
+                    
+                    Returns:
+                    Diluted APY of the pool in basis points (10,000).
+            '''
+            
         # Get current reserves of the pool
-        reserve0 = pool_state.get('reserve0', 0)
-        reserve1 = pool_state.get('reserve1', 0)
-
-        token0_decimals = input_token.decimals
-        token1_decimals = output_token.decimals
-        rprice0 = input_token.reference_price
-        rprice1 = output_token.reference_price
-
-        # Adjust for the difference in reference price scaling
-        d1 = 18 - token0_decimals
-        d2 = 18 - token1_decimals
-
-        # Normalize prices based on decimals
-        price0 = rprice0 / (10 ** d1) if rprice0 else 0
-        price1 = rprice1 / (10 ** d2) if rprice1 else 0
-
-        # If price data is missing, return 0 APY
-        if price0 == 0 or price1 == 0:
-            return Decimal(0)
-
-        adjusted_reserve0 = reserve0 / (10 ** token0_decimals)
-        adjusted_reserve1 = reserve1 / (10 ** token1_decimals)
-
-        if input_token.address == pool_state.get("token0"):
-            adjusted_amount_in = input_amount / (10 ** token0_decimals)
-            reserve0 = adjusted_reserve0 + adjusted_amount_in
-            reserve1 = adjusted_reserve1
-        else:
-            adjusted_amount_in = input_amount / (10 ** token1_decimals)
-            reserve0 = adjusted_reserve0
-            reserve1 = adjusted_reserve1 + adjusted_amount_in
-
-        # Convert token reserves into value terms using price
-        reserve0_value = reserve0 * price0
-        reserve1_value = reserve1 * price1
-
-        tvl = reserve0_value + reserve1_value
-
-        fee_data = pool_state.get('fees_over_period', {})
-        fee_amount0 = fee_data.get('amount0', 0)
-        fee_amount1 = fee_data.get('amount1', 0)
-        days = fee_data.get('days', 0)
-
-        fee_amount0 = (fee_amount0 / (10 ** token0_decimals)) * price0
-        fee_amount1 = (fee_amount1 / (10 ** token1_decimals)) * price1
-
-        # Uniswap Charges 0.3% fee on swaps
-        total_fees_value = (fee_amount0 + fee_amount1) * Decimal("0.003")
-
-        if tvl == 0 or days == 0:
-            return Decimal(0)
-
-        # Calculate daily yield from total fees
-        daily_fees = total_fees_value / days
-        daily_rate = daily_fees / tvl
-
-        # Annualize the return using simple compounding approximation
-        apy = daily_rate * 365 * 100
-
-        return Decimal(apy)
+            reserve0 = pool_state.get('reserve0', 0)
+            reserve1 = pool_state.get('reserve1', 0)
+                
+            token0_address = pool_state.get("token0_address")
+            token1_address = pool_state.get("token1_address")
+                
+            # Add the underlying amount into the pool
+            if underlying_token.address == token0_address:
+                reserve0 += underlying_amount
+            elif underlying_token.address == token1_address:
+                reserve1 += underlying_amount
+            
+            token0_decimals = pool_tokens[token0_address].decimals
+            token1_decimals = pool_tokens[token1_address].decimals
+            
+            rprice0 = pool_tokens[token0_address].reference_price
+            rprice1 = pool_tokens[token1_address].reference_price
+            
+            # Adjust for the difference in reference price scaling
+            d1 = 18 - token0_decimals
+            d2 = 18 - token1_decimals
+            
+            # Normalize prices based on decimals
+            price0 = Decimal(rprice0) / (Decimal(10) ** d1) if rprice0 else Decimal(0)
+            price1 = Decimal(rprice1) / (Decimal(10) ** d2) if rprice1 else Decimal(0)
+            
+            # If price data is missing, return 0 APY
+            if price0 == 0 or price1 == 0:
+                return 0
+                
+            # Adjust reserves for decimals
+            adjusted_reserve0 = Decimal(reserve0) / (Decimal(10) ** token0_decimals)
+            adjusted_reserve1 = Decimal(reserve1) / (Decimal(10) ** token1_decimals)
+            
+            # Convert token reserves into value terms using price
+            reserve0_value = adjusted_reserve0 * price0
+            reserve1_value = adjusted_reserve1 * price1
+            tvl = reserve0_value + reserve1_value
+            
+            fee_data = pool_state.get('fees_over_period', {})
+            fee_amount0 = fee_data.get('amount0', 0)
+            fee_amount1 = fee_data.get('amount1', 0)
+            days = fee_data.get('days', 0)
+            
+            fee_amount0 = (Decimal(fee_amount0) / (Decimal(10) ** token0_decimals)) * price0
+            fee_amount1 = (Decimal(fee_amount1) / (Decimal(10) ** token1_decimals)) * price1
+            
+            # Assume 0.3% fee portion goes to LPs (Uniswap v2-style)
+            total_fees_value = (fee_amount0 + fee_amount1) * Decimal("0.003")
+            
+            if tvl == 0 or days == 0:
+                return 0
+                
+            # Calculate daily yield from total fees
+            daily_fees = total_fees_value / Decimal(days)
+            daily_rate = daily_fees / tvl
+            
+            # Annualize the return using simple compounding approximation
+            apy = daily_rate * Decimal(365) * Decimal(100)
+                
+            # Get apy in bps
+            apy_bps = apy * Decimal(100)  # Convert percentage to basis points
+                
+            return int(apy_bps)
 
     # Core AMM swap function that implements the constant product formula (x * y = k).
     # Can calculate either output amount given input, or input needed for desired output.
