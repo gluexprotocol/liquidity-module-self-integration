@@ -133,11 +133,14 @@ class LagoonLiquidityModule(LiquidityModule):
             raise Exception("Invalid input token address")
 
         return (None, self._wei_to_ether(output_amount))
+    
+    def __get_share_price(self, totalAssets: Decimal, totalSupply: Decimal, decimals: Decimal) -> Decimal:
+        return Decimal(totalAssets) / Decimal(totalSupply + 10 ** decimals)
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
         Calculate the APY (Annual Percentage Yield) as a percentage.
-        Formula: (currentSharePrice - originSharePrice) / ETHER / days * 100
+        Formula: (currentSharePrice - originSharePrice) / days * 100
         Args:
             pool_state (Dict): The current state of the pool.
         Returns:
@@ -145,14 +148,28 @@ class LagoonLiquidityModule(LiquidityModule):
         Raises:
             Exception: If days is zero.
         """
-        currentSharePrice = Decimal(pool_state["currentSharePrice"])
-        originSharePrice = Decimal(pool_state["originSharePrice"])
+        
         days = Decimal(pool_state["days"])
+        totalAssetsBefore = Decimal(pool_state["totalAssetsBefore"])
+        totalAssets = Decimal(pool_state["totalAssets"])
+        totalSupplyBefore = Decimal(pool_state["totalSupplyBefore"])
+        totalSupply = Decimal(pool_state["totalSupply"])
+        underlyingTokenDecimals = Decimal(pool_state["underlyingTokenDecimals"])
+
+        sharePriceBefore = self.__get_share_price(
+            totalAssetsBefore, totalSupplyBefore, underlyingTokenDecimals
+        )
+        sharePrice = self.__get_share_price(
+            totalAssets, totalSupply, underlyingTokenDecimals
+        )
         
         if days == 0:
-            raise Exception("Invalid pool state for APY calculation")
+            return Decimal(0)
         
-        return self._wei_to_ether(currentSharePrice - originSharePrice) / days * Decimal(100)
+        apyDaily = (sharePrice - sharePriceBefore) / sharePriceBefore / days
+        apyCompounded = (1 + apyDaily) ** 365 - 1
+        
+        return apyCompounded * 100
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         """
@@ -169,6 +186,6 @@ class LagoonLiquidityModule(LiquidityModule):
         totalAssets = pool_state.get("totalAssets", 0)
 
         if token.symbol == "ETH" or token.symbol == "WETH":
-            return totalAssets
+            return Decimal(totalAssets)
         else:
-            return totalAssets * token.reference_price
+            return Decimal(totalAssets * token.reference_price)
