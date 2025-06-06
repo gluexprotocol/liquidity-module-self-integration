@@ -158,12 +158,17 @@ class LagoonLiquidityModule(LiquidityModule):
         """
         Get the TVL (Total Value Locked) for the pool.
         Returns the value from the pool state, or 0 if not present.
-        In terms of the underlying asset. In Ether.
+        In terms of the network native asset in its lowest denomination.
         Args:
             pool_state (Dict): The current state of the pool.
-            token (Optional[Token]): The token object (unused).
+            token (Optional[Token]): The underlying token of the Lagoon vault.
         Returns:
             Decimal: The TVL value.
         """
         
-        return self._wei_to_ether(pool_state.get("totalAssets", 0))
+        totalAssets = pool_state.get("totalAssets", 0)
+
+        if token.symbol == "ETH" or token.symbol == "WETH":
+            return totalAssets
+        else:
+            return totalAssets * token.reference_price
