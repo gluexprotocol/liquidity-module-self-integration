@@ -152,7 +152,7 @@ class LagoonLiquidityModule(LiquidityModule):
             totalAssets, totalSupply, underlyingTokenDecimals
         )
         
-        if days == 0:
+        if days == 0 or sharePriceBefore == 0:
             return Decimal(0)
         
         apyDaily = (sharePrice - sharePriceBefore) / sharePriceBefore / days
