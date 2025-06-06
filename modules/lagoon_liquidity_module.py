@@ -43,15 +43,8 @@ class LagoonLiquidityModule(LiquidityModule):
         
         return math.floor(amount * (totalSupply + 10 ** decimals) / (totalAssets + 1))
 
-    def _wei_to_ether(self, amount: int) -> Decimal:
-        """
-        Convert a value from Wei to Ether denomination.
-        Args:
-            amount (int): The amount in Wei.
-        Returns:
-            Decimal: The amount in Ether.
-        """
-        return Decimal(amount) / Constants.ETHER
+    def _get_share_price(self, totalAssets: Decimal, totalSupply: Decimal, decimals: Decimal) -> Decimal:
+        return Decimal(totalAssets) / Decimal(totalSupply + 10 ** decimals)
 
     def get_amount_in(
         self,
@@ -71,11 +64,10 @@ class LagoonLiquidityModule(LiquidityModule):
             output_token (Token): The output token object.
             output_amount (int): The desired output amount.
         Returns:
-            Tuple[None, int]: Tuple of (fee, input amount in Ether denomination).
+            Tuple[None, int]: Tuple of (fee, input amount in lowest denomination).
         Raises:
             Exception: If pool state or output amount is invalid, or token address is invalid.
         """
-        # Input validation
         if (
             pool_state["totalAssets"] == 0 or
             pool_state["totalSupply"] == 0 or
@@ -92,7 +84,7 @@ class LagoonLiquidityModule(LiquidityModule):
         else:
             raise Exception("Invalid input token address")
         
-        return (None, self._wei_to_ether(input_amount))
+        return (None, input_amount)
 
     def get_amount_out(
         self,
@@ -112,7 +104,7 @@ class LagoonLiquidityModule(LiquidityModule):
             output_token (Token): The output token object.
             input_amount (int): The input amount.
         Returns:
-            Tuple[None, Decimal]: Tuple of (fee, output amount in Ether denomination).
+            Tuple[None, Decimal]: Tuple of (fee, output amount in lowest denomination).
         Raises:
             Exception: If pool state or input amount is invalid, or token address is invalid.
         """
@@ -132,10 +124,7 @@ class LagoonLiquidityModule(LiquidityModule):
         else:
             raise Exception("Invalid input token address")
 
-        return (None, self._wei_to_ether(output_amount))
-    
-    def __get_share_price(self, totalAssets: Decimal, totalSupply: Decimal, decimals: Decimal) -> Decimal:
-        return Decimal(totalAssets) / Decimal(totalSupply + 10 ** decimals)
+        return (None, output_amount)
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         """
@@ -156,10 +145,10 @@ class LagoonLiquidityModule(LiquidityModule):
         totalSupply = Decimal(pool_state["totalSupply"])
         underlyingTokenDecimals = Decimal(pool_state["underlyingTokenDecimals"])
 
-        sharePriceBefore = self.__get_share_price(
+        sharePriceBefore = self._get_share_price(
             totalAssetsBefore, totalSupplyBefore, underlyingTokenDecimals
         )
-        sharePrice = self.__get_share_price(
+        sharePrice = self._get_share_price(
             totalAssets, totalSupply, underlyingTokenDecimals
         )
         
