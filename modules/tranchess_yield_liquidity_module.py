@@ -20,7 +20,28 @@ class TranchessYieldLiquidityModule(LiquidityModule):
         # Obtainable from SwapAdded(address addr0, address addr1, address swap) event
         # it MUST be structured as this: swapMap[addr0][addr1] = swap
         swapMap = pool_states["swapMap"]
+    
+    def _get_creation_result(self, fundUnderlying: int, fundEquivalentTotalQ: int, input_amount: int) -> tuple[int | None, int | None]:
+        fee = 0
+        outputAmount = 0
 
+        if fundEquivalentTotalQ <= 0:
+            fee = None
+            outputAmount = None
+        else:
+            prec = (fundEquivalentTotalQ - 1) / fundEquivalentTotalQ
+            minOutQ = (fundEquivalentTotalQ * (input_amount - prec)) / fundUnderlying
+            
+            fee = None
+            outputAmount = int(minOutQ)
+        
+        return fee, outputAmount
+
+    def _get_redemption_result(self, fundUnderlying: int, fundEquivalentTotalQ: int, redemptionFee: int, input_amount: int) -> tuple[int | None, int | None]:
+        resultingUnderlying = input_amount * fundUnderlying / fundEquivalentTotalQ
+        resultingFee = self._multiplyDecimal(resultingUnderlying, redemptionFee)
+
+        return resultingFee, resultingUnderlying
 
     def get_amount_out(
         self, 
@@ -43,19 +64,15 @@ class TranchessYieldLiquidityModule(LiquidityModule):
                 
                 if output_token.address.lower() == fixed_parameters["QUEENTokenAddress"]:
                     # Creation
-                    if fundEquivalentTotalQ <= 0:
-                        fee = None
-                        outputAmount = None
-                    else:
-                        prec = (fundEquivalentTotalQ - 1) / fundEquivalentTotalQ
-                        minOutQ = (fundEquivalentTotalQ * (input_amount - prec)) / fundUnderlying
-                        
-                        fee = None
-                        outputAmount = int(minOutQ)
-                if input_token.address.lower() == fixed_parameters["QUEENTokenAddress"]:
+                    fee, outputAmount = self._get_creation_result(fundUnderlying, fundEquivalentTotalQ, input_amount)
+                elif input_token.address.lower() == fixed_parameters["QUEENTokenAddress"]:
                     # Redemption
-                    resultingUnderlying = input_amount * fundUnderlying / fundEquivalentTotalQ
-                    resultingFee = self._multiplyDecimal(resultingUnderlying, fixed_parameters["QUEENRedemptionFee"])
+                    resultingFee, resultingUnderlying = self._get_redemption_result(
+                        fundUnderlying, 
+                        fundEquivalentTotalQ, 
+                        fixed_parameters["QUEENRedemptionFee"], 
+                        input_amount
+                    )
                     
                     fee = resultingFee
                     outputAmount = resultingUnderlying - resultingFee
@@ -65,7 +82,14 @@ class TranchessYieldLiquidityModule(LiquidityModule):
                 # nQUEEN-BNB Stable Swap: 0xfcF44D5EB5C4A03D03CF5B567C7CDe9B66Ba5773
                 pass
         elif pool_states["isTurboAndStableFund"]:
-            pass
+            if pool_states["isPrimaryMarket"]:
+                # https://tranchess.com/primary-market/56
+                # "Create QUEEN token at 1:1 ratio with asBNB, uniBTC or brBTC"
+                fee = None
+                outputAmount = input_amount
+            else:
+                # https://tranchess.com/swap/56
+                pass
         else:
             fee = None
             outputAmount = None
