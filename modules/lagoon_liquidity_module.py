@@ -182,10 +182,11 @@ class LagoonLiquidityModule(LiquidityModule):
             dDecimals = ethDecimals - tokenDecimals
 
             multiplier = Decimal(10) ** abs(dDecimals)
+            tvl = totalAssets * token.reference_price / ethDecimals
 
             if dDecimals < 0:
-                return totalAssets * multiplier
+                return tvl * multiplier
             elif dDecimals > 0:
-                return totalAssets / multiplier
+                return tvl / multiplier
             else:
-                return totalAssets
+                return tvl

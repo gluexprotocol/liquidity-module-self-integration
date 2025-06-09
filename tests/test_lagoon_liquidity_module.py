@@ -64,15 +64,15 @@ def fixed_parameters(request):
     return request.param
 
 @pytest.fixture(params=[
-    Token(symbol="ETH", address="0x0", decimals=18, reference_price=1.0),
-    Token(symbol="USDC", address="0x2", decimals=6, reference_price=0.0003),
+    Token(symbol="ETH", address="0x0", decimals=18, reference_price=Decimal("1e18")),  # 1.0 ETH in WEI
+    Token(symbol="USDC", address="0x2", decimals=6, reference_price=Decimal("3e14")),  # 0.0003 ETH in WEI
 ])
 def asset_token(request):
     return request.param
 
 @pytest.fixture(params=[
-    Token(symbol="LAG", address="0x1", decimals=18, reference_price=0.5),
-    Token(symbol="ALT", address="0x3", decimals=8, reference_price=0.01),
+    Token(symbol="LAG", address="0x1", decimals=18, reference_price=Decimal("5e17")),  # 0.5 ETH in WEI
+    Token(symbol="ALT", address="0x3", decimals=8, reference_price=Decimal("1e16")),   # 0.01 ETH in WEI
 ])
 def share_token(request):
     return request.param
@@ -129,23 +129,62 @@ def test_get_tvl(lagoon_module, pool_state, asset_token):
     assert tvl >= 0
 
 def test_get_tvl_various_decimals(lagoon_module, pool_state):
-    # Token with decimals less than 18
-    token_6 = Token(symbol="USDC6", address="0x6", decimals=6, reference_price=0.0003)
+    ethDecimals = Decimal(18)
+    totalAssets = Decimal(pool_state.get("totalAssets", 0))
+
+    # Token with decimals less than 18 (e.g., USDC6)
+    token_6 = Token(
+        symbol="USDC6",
+        address="0x6",
+        decimals=6,
+        reference_price=Decimal("1e17")  # 0.1 in WEI
+    )
+    dDecimals_6 = ethDecimals - token_6.decimals
+    multiplier_6 = Decimal(10) ** abs(dDecimals_6)
     tvl_6 = lagoon_module.get_tvl(pool_state, token_6)
-    # Should scale down by 10**12
-    expected_6 = Decimal(pool_state.get("totalAssets", 0)) / Decimal(10) ** 12
-    assert tvl_6 == expected_6
+    tvl_base_6 = totalAssets * token_6.reference_price / ethDecimals
+    if dDecimals_6 < 0:
+        expected_6 = tvl_base_6 * multiplier_6
+    elif dDecimals_6 > 0:
+        expected_6 = tvl_base_6 / multiplier_6
+    else:
+        expected_6 = tvl_base_6
+    assert tvl_6 == expected_6, f"tvl_6={tvl_6}, expected_6={expected_6}"
 
-    # Token with decimals exactly 18
-    token_18 = Token(symbol="ETH18", address="0x18", decimals=18, reference_price=1.0)
+    # Token with decimals exactly 18 (e.g., ETH18)
+    token_18 = Token(
+        symbol="ETH18",
+        address="0x18",
+        decimals=18,
+        reference_price=Decimal("1e18")  # 1.0 in WEI
+    )
+    dDecimals_18 = ethDecimals - token_18.decimals
+    multiplier_18 = Decimal(10) ** abs(dDecimals_18)
     tvl_18 = lagoon_module.get_tvl(pool_state, token_18)
-    # Should be unchanged
-    expected_18 = Decimal(pool_state.get("totalAssets", 0))
-    assert tvl_18 == expected_18
+    tvl_base_18 = totalAssets * token_18.reference_price / ethDecimals
+    if dDecimals_18 < 0:
+        expected_18 = tvl_base_18 * multiplier_18
+    elif dDecimals_18 > 0:
+        expected_18 = tvl_base_18 / multiplier_18
+    else:
+        expected_18 = tvl_base_18
+    assert tvl_18 == expected_18, f"tvl_18={tvl_18}, expected_18={expected_18}"
 
-    # Token with decimals more than 18
-    token_24 = Token(symbol="BIG24", address="0x24", decimals=24, reference_price=0.000001)
+    # Token with decimals more than 18 (e.g., BIG24)
+    token_24 = Token(
+        symbol="BIG24",
+        address="0x24",
+        decimals=24,
+        reference_price=Decimal("1e15")  # 0.001 in WEI
+    )
+    dDecimals_24 = ethDecimals - token_24.decimals
+    multiplier_24 = Decimal(10) ** abs(dDecimals_24)
     tvl_24 = lagoon_module.get_tvl(pool_state, token_24)
-    # Should scale up by 10**6
-    expected_24 = Decimal(pool_state.get("totalAssets", 0)) * Decimal(10) ** 6
-    assert tvl_24 == expected_24
+    tvl_base_24 = totalAssets * token_24.reference_price / ethDecimals
+    if dDecimals_24 < 0:
+        expected_24 = tvl_base_24 * multiplier_24
+    elif dDecimals_24 > 0:
+        expected_24 = tvl_base_24 / multiplier_24
+    else:
+        expected_24 = tvl_base_24
+    assert tvl_24 == expected_24, f"tvl_24={tvl_24}, expected_24={expected_24}"
