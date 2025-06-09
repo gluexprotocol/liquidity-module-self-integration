@@ -172,9 +172,20 @@ class LagoonLiquidityModule(LiquidityModule):
             Decimal: The TVL value.
         """
         
-        totalAssets = pool_state.get("totalAssets", 0)
+        totalAssets = Decimal(pool_state.get("totalAssets", 0))
 
         if token.symbol == "ETH" or token.symbol == "WETH":
             return Decimal(totalAssets)
         else:
-            return Decimal(totalAssets * token.reference_price)
+            ethDecimals = 18
+            tokenDecimals = token.decimals
+            dDecimals = ethDecimals - tokenDecimals
+
+            multiplier = Decimal(10) ** abs(dDecimals)
+
+            if dDecimals < 0:
+                return totalAssets * multiplier
+            elif dDecimals > 0:
+                return totalAssets / multiplier
+            else:
+                return totalAssets
