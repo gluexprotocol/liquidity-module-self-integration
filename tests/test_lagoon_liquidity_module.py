@@ -12,8 +12,6 @@ def lagoon_module():
     {
         "totalAssets": 10_000 * 10**18,
         "totalSupply": 5_000 * 10**18,
-        "currentSharePrice": 2 * 10**18,
-        "originSharePrice": 1 * 10**18,
         "days": 100,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
@@ -25,8 +23,6 @@ def lagoon_module():
     {
         "totalAssets": 0,
         "totalSupply": 0,
-        "currentSharePrice": 0,
-        "originSharePrice": 0,
         "days": 1,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
@@ -38,8 +34,6 @@ def lagoon_module():
     {
         "totalAssets": 10**30,
         "totalSupply": 10**30,
-        "currentSharePrice": 10**30,
-        "originSharePrice": 10**29,
         "days": 365,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
@@ -51,8 +45,6 @@ def lagoon_module():
     {
         "totalAssets": 10_000 * 10**18,
         "totalSupply": 5_000 * 10**18,
-        "currentSharePrice": 2 * 10**18,
-        "originSharePrice": 1 * 10**18,
         "days": 0,
         "vaultContractAddress": "0x1",
         "underlyingTokenAddress": "0x0",
