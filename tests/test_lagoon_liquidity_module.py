@@ -127,3 +127,25 @@ def test_get_tvl(lagoon_module, pool_state, asset_token):
     tvl = lagoon_module.get_tvl(pool_state, asset_token)
     assert isinstance(tvl, Decimal)
     assert tvl >= 0
+
+def test_get_tvl_various_decimals(lagoon_module, pool_state):
+    # Token with decimals less than 18
+    token_6 = Token(symbol="USDC6", address="0x6", decimals=6, reference_price=0.0003)
+    tvl_6 = lagoon_module.get_tvl(pool_state, token_6)
+    # Should scale down by 10**12
+    expected_6 = Decimal(pool_state.get("totalAssets", 0)) / Decimal(10) ** 12
+    assert tvl_6 == expected_6
+
+    # Token with decimals exactly 18
+    token_18 = Token(symbol="ETH18", address="0x18", decimals=18, reference_price=1.0)
+    tvl_18 = lagoon_module.get_tvl(pool_state, token_18)
+    # Should be unchanged
+    expected_18 = Decimal(pool_state.get("totalAssets", 0))
+    assert tvl_18 == expected_18
+
+    # Token with decimals more than 18
+    token_24 = Token(symbol="BIG24", address="0x24", decimals=24, reference_price=0.000001)
+    tvl_24 = lagoon_module.get_tvl(pool_state, token_24)
+    # Should scale up by 10**6
+    expected_24 = Decimal(pool_state.get("totalAssets", 0)) * Decimal(10) ** 6
+    assert tvl_24 == expected_24
