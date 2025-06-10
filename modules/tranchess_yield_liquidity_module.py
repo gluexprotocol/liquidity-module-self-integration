@@ -93,15 +93,24 @@ class TranchessYieldLiquidityModule(LiquidityModule):
                 pass # TODO
         
         return newBase, newQuote
+    
+    # Adaptation of StableSwap.getAmpl()
+    def _get_ampl(
+        self,
+        pool_states: Dict,
+        fixed_parameters: Dict
+    ) -> int:
+        pass
 
-
+    # Adaptation of StableSwap.getQuoteOut()
     def _get_quote_out(
         self,
         pool_states: Dict,
         fixed_parameters: Dict,
         input_token: Token,
         output_token: Token,
-        input_amount: int
+
+        baseIn: int
     ) -> int:
         # Obtainable from Fund.getRebalanceSize() view function
         rebalanceSize = pool_states["rebalanceSize"]
@@ -110,7 +119,9 @@ class TranchessYieldLiquidityModule(LiquidityModule):
             fixed_parameters,
             rebalanceSize
         )
+        newBase = oldBase + baseIn
     
+    # Adaptation of SwapRouter.getAmountsOut()
     def _get_multihop_result(
         self,
         pool_states: Dict,
@@ -119,8 +130,12 @@ class TranchessYieldLiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int
     ) -> Optional[tuple[list[int], list[str], list[bool]]]:
+        # Important addresses
+        # BSC SwapRouter - 0x3599dDC1efcE801f8657f64127ACB07c0B5CAdC2
+        
         # Obtainable from SwapAdded(address addr0, address addr1, address swap) event
         # it MUST be structured as this: swapMap[addr0][addr1] = swap
+        # is a map of StableSwap addresses
         swapMap = pool_states["swapMap"]
         swapPath = pool_states["swapPath"]
         # Obtainable by calling baseAddress() view function from `swap` of SwapAdded event
@@ -230,10 +245,15 @@ class TranchessYieldLiquidityModule(LiquidityModule):
                 # https://tranchess.com/primary-market/56
                 # "Create QUEEN token at 1:1 ratio with asBNB, uniBTC or brBTC"
                 fee = None
-                outputAmount = input_amount
+                slippagePrecaution = 10**4 # Sometimes, 100% of underlying will be 99.99% of QUEEN
+                outputAmount = input_amount - slippagePrecaution
             else:
                 # https://tranchess.com/swap/56
                 pass
+        elif pool_states["isTranche"]:
+            # https://tranchess.com/bishop
+            # https://tranchess.com/rook
+            pass
         else:
             fee = None
             outputAmount = None
