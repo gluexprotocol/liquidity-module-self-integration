@@ -2,7 +2,7 @@ from templates.liquidity_module import LiquidityModule, Token
 from typing import Dict, Optional
 from decimal import Decimal
 
-class MyProtocolLiquidityModule(LiquidityModule):
+class ClipperLiquidityModule(LiquidityModule):
     def _get_lptoken_value(self, pool_state: Dict, amount: Decimal) -> Decimal:
         tvl = self.get_tvl(pool_state)
         totalSupply = Decimal(pool_state["allTokensBalance"]["totalSupply"])
@@ -12,6 +12,74 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
         # Both has 18 decimals
         return tvl / totalSupply
+    
+    def _get_quote_for(self, output_asset: Dict, input_asset: Dict, input_token: Token, output_token: Token) -> Decimal:
+        outPrice = Decimal(output_asset["price_in_usd"])
+        inPrice = Decimal(input_asset["price_in_usd"])
+        d1 = input_token.decimals
+        d2 = output_token.decimals
+
+        if inPrice == 0:
+            return Decimal(0)
+        
+        priceRatio = inPrice / outPrice
+        priceRatio *= Decimal(10) ** (d2 - d1)
+        
+        return priceRatio
+
+    def _get_pair(self, pool: Dict, token0: Token, token1: Token) -> Optional[Dict]:
+        pairs = pool["pairs"]
+        for pair in pairs:
+            if token0.symbol.upper() in pair["assets"] and token1.symbol.upper() in pair["assets"]:
+                return pair
+        
+        return None
+    
+    def _get_amount_out(
+        self,
+        pair: Dict,
+        input_amount: int,
+        quote: Decimal
+    ) -> tuple[Decimal | None, Decimal | None]:
+        """
+        Calculate the output amount and fee for a given input amount.
+        output_amount is in the lowest unit of asset0.
+        """
+
+        # already in output asset's lowest unit
+        # Example: Sell 1 ETH on ETH/USDC pair for 1 USDC
+        # `quote` is (1e6/1)/(1e18/1) which is equivalent to (1e6/1)*(1/1e18)
+        # 1e18   1e6    1
+        #      * --- * ---- = 1e6 (which is 1 USDC)
+        #         1    1e18
+        output_amount = Decimal(input_amount) * quote
+
+        feePercentage = Decimal(pair["fee_in_basis_points"]) / Decimal(10000)
+        fee = output_amount * feePercentage
+        
+        output_amount -= fee
+        return fee, output_amount
+    
+    def _get_assets(self, pool: Dict, input_token: Token, output_token: Token) -> tuple[Optional[Dict], Optional[Dict]]:
+        # asset0 = input_token
+        # asset1 = output_token
+        asset0 = None
+        asset1 = None
+
+        for asset in pool["assets"]:
+            if not asset0:
+                if asset["address"].lower() == input_token.address.lower():
+                    asset0 = asset
+            if not asset1:
+                if asset["address"].lower() == output_token.address.lower():
+                    asset1 = asset
+            
+            if asset0 and asset1:
+                break
+        
+        if not asset0 or not asset1:
+            return None, None
+        return asset0, asset1
 
     def get_amount_out(
         self, 
@@ -21,8 +89,30 @@ class MyProtocolLiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int, 
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
-        pass
+        # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
+        pools = pool_states["pools"]
+
+        for pool in pools:
+            if not pool["pool"]["swaps_enabled"]:
+                continue
+
+            # asset_in = input_token, asset_out = output_token
+            asset_in, asset_out = self._get_assets(pool, input_token, output_token)
+            if asset_in is None or asset_out is None:
+                continue
+
+            pair = self._get_pair(pool, input_token, output_token)
+            if pair is None:
+                continue
+
+            # quote = price_out / price_in
+            quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
+            if quote == 0:
+                return 0, 0
+
+            fee, output_amount = self._get_amount_out(pair, input_amount, quote)
+            return int(fee), int(output_amount)
+        return None, None
 
     def get_amount_in(
         self, 
