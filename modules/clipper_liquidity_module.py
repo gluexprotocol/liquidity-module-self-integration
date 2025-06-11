@@ -82,6 +82,47 @@ class ClipperLiquidityModule(LiquidityModule):
         if not asset0 or not asset1:
             return None, None
         return asset0, asset1
+    
+    # Unused
+    def _get_lp_token_amount_minted(
+        self,
+        pool_state: Dict,
+        fixed_parameters: Dict,
+        input_token: Token,
+        input_amount: int
+    ) -> Decimal:
+        pass
+
+    # Unused
+    def _get_single_underlying_by_lp_burn(
+        self,
+        pool_state: Dict,
+        fixed_parameters: Dict,
+        output_token: Token,
+        input_amount: int
+    ) -> Decimal:
+        pass
+
+    # Unused
+    def _process_liquidity_provisioning(
+        self,
+        pool_state: Dict,
+        fixed_parameters: Dict,
+
+        input_token: Token,
+        output_token: Token,
+        amount: int,
+        is_add: bool
+    ) -> tuple[int | None, int | None]:
+        fee = None
+        result_amount = None
+
+        if is_add:
+            pass
+        else:
+            pass
+            
+        return fee, result_amount
 
     def get_amount_out(
         self,
@@ -92,26 +133,37 @@ class ClipperLiquidityModule(LiquidityModule):
         input_amount: int,
     ) -> tuple[int | None, int | None]:
         # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
-        pools = pool_states["pools"]
-        for pool in pools:
-            if not pool["pool"]["swaps_enabled"]:
-                continue
+        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"]
+        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"]
+        
+        if is_input_lp or is_output_lp:
+            fee, output_amount = self._process_liquidity_provisioning(
+                pool_states, fixed_parameters,
+                input_token, output_token, input_amount, is_add=is_input_lp
+            )
+            return fee, output_amount
+        else:
+            pools = pool_states["pools"]
+            for pool in pools:
+                if not pool["pool"]["swaps_enabled"]:
+                    continue
 
-            # asset_in = input_token, asset_out = output_token
-            asset_in, asset_out = self._get_assets(pool, input_token, output_token)
-            if asset_in is None or asset_out is None:
-                continue
+                # asset_in = input_token, asset_out = output_token
+                asset_in, asset_out = self._get_assets(pool, input_token, output_token)
+                if asset_in is None or asset_out is None:
+                    continue
 
-            pair = self._get_pair(pool, input_token, output_token)
-            if pair is None:
-                continue
+                pair = self._get_pair(pool, input_token, output_token)
+                if pair is None:
+                    continue
 
-            quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
-            if quote == 0:
-                return 0, 0
-            
-            fee, output_amount = self._get_amount_out(pair, input_amount, quote)
-            return int(fee), int(output_amount)
+                quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
+                if quote == 0:
+                    return 0, 0
+                
+                fee, output_amount = self._get_amount_out(pair, input_amount, quote)
+                return int(fee), int(output_amount)
+        
         return None, None
 
     def get_amount_in(
@@ -123,26 +175,36 @@ class ClipperLiquidityModule(LiquidityModule):
         output_amount: int
     ) -> tuple[int | None, int | None]:
         # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
-        pools = pool_states["pools"]
-        for pool in pools:
-            if not pool["pool"]["swaps_enabled"]:
-                continue
-            
-            asset_in, asset_out = self._get_assets(pool, input_token, output_token)
-            if asset_in is None or asset_out is None:
-                continue
-                
-            pair = self._get_pair(pool, input_token, output_token)
-            if pair is None:
-                continue
-            
-            quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
-            if quote == 0:
-                return None, None
-            
-            fee, output_amount = self._get_amount_in(pair, output_amount, quote)
-            return int(fee), int(output_amount)
+        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"]
+        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"]
         
+        if is_input_lp or is_output_lp:
+            fee, output_amount = self._process_liquidity_provisioning(
+                pool_states, fixed_parameters,
+                input_token, output_token, output_amount, is_add=is_input_lp
+            )
+            return fee, output_amount
+        else:
+            pools = pool_states["pools"]
+            for pool in pools:
+                if not pool["pool"]["swaps_enabled"]:
+                    continue
+                
+                asset_in, asset_out = self._get_assets(pool, input_token, output_token)
+                if asset_in is None or asset_out is None:
+                    continue
+                    
+                pair = self._get_pair(pool, input_token, output_token)
+                if pair is None:
+                    continue
+                
+                quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
+                if quote == 0:
+                    return None, None
+                
+                fee, output_amount = self._get_amount_in(pair, output_amount, quote)
+                return int(fee), int(output_amount)
+            
         return None, None
 
     def get_apy(self, pool_state: Dict) -> Decimal:
