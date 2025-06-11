@@ -151,7 +151,7 @@ def test_get_amount_out_basic(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 10**18  # 1 ETH
@@ -167,7 +167,7 @@ def test_get_amount_out_swaps_disabled(clipper_module):
             {"pool": {"swaps_enabled": False}, "assets": [], "pairs": []}
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 10**18
@@ -188,7 +188,7 @@ def test_get_amount_out_no_valid_pair(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 10**18
@@ -211,7 +211,7 @@ def test_get_amount_out_zero_quote(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 10**18
@@ -221,7 +221,7 @@ def test_get_amount_out_zero_quote(clipper_module):
 # Edge: no pools
 def test_get_amount_out_no_pools(clipper_module):
     pool_states = {"pools": []}
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 10**18
@@ -255,8 +255,9 @@ def test_get_amount_out_precise_calculation_eth_to_usdc(clipper_module):
     # Final output = 2_000_000_000 - 6_000_000 = 1_994_000_000
     expected_fee = 6_000_000
     expected_output = 1_994_000_000
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert fee == expected_fee
     assert output == expected_output
@@ -288,8 +289,9 @@ def test_get_amount_out_precise_calculation_usdc_to_wbtc(clipper_module):
     # Final output = 2_500_000 - 12_500 = 2_487_500
     expected_fee = 12_500
     expected_output = 2_487_500
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert fee == expected_fee
     assert output == expected_output
@@ -313,8 +315,9 @@ def test_get_amount_out_zero_fee(clipper_module):
     input_amount = 10**18  # 1 ETH
 
     expected_output = 2_000_000_000 # 2000 USDC
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert fee == 0
     assert output == expected_output
@@ -336,8 +339,9 @@ def test_get_amount_out_zero_input(clipper_module):
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     input_amount = 0
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert fee == 0
     assert output == 0
@@ -362,8 +366,9 @@ def test_get_amount_out_case_insensitive_symbol_matching(clipper_module):
     input_amount = 10**18
 
     expected_output = 1_994_000_000
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert output == expected_output, "Should find the pair regardless of symbol case"
 
@@ -392,8 +397,9 @@ def test_get_amount_out_multiple_pools_uses_first_valid(clipper_module):
 
     # The expected output should be based on the FIRST pool's fee (30 bps)
     expected_output = 1_994_000_000
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
 
-    fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 
     assert output == expected_output, "The function should have returned the result from the first valid pool"
 
@@ -416,7 +422,7 @@ def test_get_amount_out_asset_not_exists(clipper_module):
 			}
 		]
 	}
-	fixed_parameters = {}
+	fixed_parameters = {"lpTokenAddress": "0xLP"}
 	input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
 	output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
 	input_amount = 10**18
@@ -441,6 +447,32 @@ def test_get_amount_out_asset_not_exists(clipper_module):
 	fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
 	assert fee is None and output is None
 
+def test_get_amount_out_lp_token(clipper_module):
+    """
+    Tests get_amount_out when the input or output token is the LP token.
+    Should return (None, None) since unimplemented.
+    """
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    {"address": "0xLP", "price_in_usd": "1", "decimals": 18},
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6}
+                ],
+                "pairs": [
+                    {"assets": ["LP", "USDC"], "fee_in_basis_points": 30}
+                ]
+            }
+        ]
+    }
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
+    input_token = Token(address="0xLP", symbol="LP", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    input_amount = 10**18
+    fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
+    assert fee is None and output is None
+
 def test_get_amount_in_basic(clipper_module):
     """Test a basic get_amount_in calculation with a valid pool, assets, and pair."""
     pool_states = {
@@ -457,7 +489,7 @@ def test_get_amount_in_basic(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_amount = 1_994_000_000  # 1994 USDC (after fee)
@@ -476,7 +508,7 @@ def test_get_amount_in_swaps_disabled(clipper_module):
             {"pool": {"swaps_enabled": False}, "assets": [], "pairs": []}
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_amount = 1_000_000
@@ -497,7 +529,7 @@ def test_get_amount_in_no_valid_pair(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_amount = 1_000_000
@@ -520,7 +552,7 @@ def test_get_amount_in_zero_quote(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_amount = 1_000_000
@@ -543,13 +575,12 @@ def test_get_amount_in_zero_output(clipper_module):
             }
         ]
     }
-    fixed_parameters = {}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_amount = 0
     fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
     assert fee == 0 and input_amt == 0
-
 
 def test_get_amount_in_precise_calculation_usdc_to_eth(clipper_module):
     """
@@ -569,6 +600,7 @@ def test_get_amount_in_precise_calculation_usdc_to_eth(clipper_module):
             }
         ]
     }
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
     input_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
     output_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
     # The desired output is 1 ETH
@@ -597,7 +629,7 @@ def test_get_amount_in_precise_calculation_usdc_to_eth(clipper_module):
     expected_fee = 6018054       # Truncated to int
 
     # Execute the function
-    fee, input_amt = clipper_module.get_amount_in(pool_states, {}, input_token, output_token, output_amount)
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
 
     # Assert the exact integer values
     assert isinstance(fee, int)
@@ -624,7 +656,7 @@ def test_get_amount_in_asset_not_exists(clipper_module):
 			}
 		]
 	}
-	fixed_parameters = {}
+	fixed_parameters = {"lpTokenAddress": "0xLP"}
 	input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
 	output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
 	output_amount = 1_000_000
@@ -648,3 +680,23 @@ def test_get_amount_in_asset_not_exists(clipper_module):
 	}
 	fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
 	assert fee is None and input_amt is None
+
+def test_get_amount_in_lp_token(clipper_module):
+    """
+    Tests get_amount_in when either the input_token or output_token is the LP token.
+    Should return (None, None) since unimplemented.
+    """
+    pool_states = {"pools": []}
+    fixed_parameters = {"lpTokenAddress": "0xLP"}
+    # LP token as input
+    input_token = Token(address="0xLP", symbol="CLP", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 1_000_000
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee is None and input_amt is None
+
+    # LP token as output
+    input_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_token = Token(address="0xLP", symbol="CLP", decimals=18, reference_price=Decimal("1e18"))
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee is None and input_amt is None

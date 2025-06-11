@@ -133,8 +133,8 @@ class ClipperLiquidityModule(LiquidityModule):
         input_amount: int,
     ) -> tuple[int | None, int | None]:
         # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
-        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"]
-        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"]
+        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"].lower()
+        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"].lower()
         
         if is_input_lp or is_output_lp:
             fee, output_amount = self._process_liquidity_provisioning(
@@ -175,8 +175,8 @@ class ClipperLiquidityModule(LiquidityModule):
         output_amount: int
     ) -> tuple[int | None, int | None]:
         # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
-        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"]
-        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"]
+        is_input_lp = input_token.address.lower() == fixed_parameters["lpTokenAddress"].lower()
+        is_output_lp = output_token.address.lower() == fixed_parameters["lpTokenAddress"].lower()
         
         if is_input_lp or is_output_lp:
             fee, output_amount = self._process_liquidity_provisioning(
