@@ -3,6 +3,16 @@ from typing import Dict, Optional
 from decimal import Decimal
 
 class MyProtocolLiquidityModule(LiquidityModule):
+    def _get_lptoken_value(self, pool_state: Dict, amount: Decimal) -> Decimal:
+        tvl = self.get_tvl(pool_state)
+        totalSupply = Decimal(pool_state["allTokensBalance"]["totalSupply"])
+
+        if totalSupply == 0:
+            return Decimal(0)
+
+        # Both has 18 decimals
+        return tvl / totalSupply
+
     def get_amount_out(
         self, 
         pool_states: Dict, 
@@ -26,8 +36,23 @@ class MyProtocolLiquidityModule(LiquidityModule):
         pass
 
     def get_apy(self, pool_state: Dict) -> Decimal:
-        # Implement APY calculation logic
-        pass
+        lpTokenValue = self._get_lptoken_value(pool_state, 1)
+
+        oldAll = pool_state["allTokensBalance"]
+        pool_state["allTokensBalance"] = pool_state["previousAllTokensBalance"]
+        pDLpTokenValue = self._get_lptoken_value(pool_state, 1)
+        pool_state["allTokensBalance"] = oldAll
+
+        days = pool_state["days"]
+        if days == 0:
+            return Decimal(0)
+        
+        apyDaily = (lpTokenValue - pDLpTokenValue) / days
+        apyCompounded = (1 + apyDaily) ** 365 - 1
+
+        if apyCompounded < 0:
+            return Decimal(0)
+        return apyCompounded * 100
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
         # From Pool.allTokensBalance()
@@ -42,7 +67,7 @@ class MyProtocolLiquidityModule(LiquidityModule):
         tvl = 0
 
         for i, token_ in enumerate(allTokensBalance["tokens"]):
-            balance = allTokensBalance["balances"][i]
+            balance = Decimal(allTokensBalance["balances"][i])
             balance *= token_.reference_price
             
             d2 = token_.decimals
