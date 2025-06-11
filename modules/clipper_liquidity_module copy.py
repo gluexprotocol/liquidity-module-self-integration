@@ -30,5 +30,30 @@ class MyProtocolLiquidityModule(LiquidityModule):
         pass
 
     def get_tvl(self, pool_state: Dict, token: Optional[Token] = None) -> Decimal:
-        # Implement TVL calculation logic
-        pass
+        # From Pool.allTokensBalance()
+        # Structure:
+        # {
+        #     "balances": list[int],
+        #     "tokens": list[Token],
+        #     "totalSupply": int,
+        # }
+        allTokensBalance = pool_state["allTokensBalance"]
+
+        tvl = 0
+
+        for i, token in enumerate(allTokensBalance["tokens"]):
+            balance = allTokensBalance["balances"][i]
+
+            balance *= token.reference_price
+            
+            d1 = 18 # Native token decimals
+            d2 = token.decimals
+
+            if d2 > d1:
+                balance /= 10 ** (d2 - d1)
+            elif d2 < d1:
+                balance *= 10 ** (d1 - d2)
+
+            tvl += balance
+
+        return tvl
