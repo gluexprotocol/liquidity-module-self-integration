@@ -131,7 +131,6 @@ def test_get_tvl(lagoon_module, pool_state, asset_token):
     assert tvl >= 0
 
 def test_get_tvl_various_decimals(lagoon_module, pool_state):
-    ethDecimals = 18
     totalAssets = Decimal(pool_state.get("totalAssets", 0))
 
     # Token with decimals less than 18 (e.g., USDC6)
@@ -141,11 +140,8 @@ def test_get_tvl_various_decimals(lagoon_module, pool_state):
         decimals=6,
         reference_price=Decimal("1e17")  # 0.1 in WEI
     )
-    dDecimals_6 = abs(ethDecimals - token_6.decimals)
     tvl_6 = lagoon_module.get_tvl(pool_state, token_6)
-    expected_6 = totalAssets * token_6.reference_price
-    if dDecimals_6 > 0:
-        expected_6 *= Decimal(10) ** dDecimals_6
+    expected_6 = totalAssets * token_6.reference_price / Decimal(10 ** token_6.decimals)
     assert tvl_6 == expected_6, f"tvl_6={tvl_6}, expected_6={expected_6}"
 
     # Token with decimals exactly 18 (e.g., ETH18)
@@ -155,11 +151,8 @@ def test_get_tvl_various_decimals(lagoon_module, pool_state):
         decimals=18,
         reference_price=Decimal("1e18")  # 1.0 in WEI
     )
-    dDecimals_18 = abs(ethDecimals - token_18.decimals)
     tvl_18 = lagoon_module.get_tvl(pool_state, token_18)
-    expected_18 = totalAssets * token_18.reference_price
-    if dDecimals_18 > 0:
-        expected_18 *= Decimal(10) ** dDecimals_18
+    expected_18 = totalAssets * token_18.reference_price / Decimal(10 ** token_18.decimals)
     assert tvl_18 == expected_18, f"tvl_18={tvl_18}, expected_18={expected_18}"
 
     # Token with decimals more than 18 (e.g., BIG24)
@@ -169,9 +162,6 @@ def test_get_tvl_various_decimals(lagoon_module, pool_state):
         decimals=24,
         reference_price=Decimal("1e15")  # 0.001 in WEI
     )
-    dDecimals_24 = abs(ethDecimals - token_24.decimals)
     tvl_24 = lagoon_module.get_tvl(pool_state, token_24)
-    expected_24 = totalAssets * token_24.reference_price
-    if dDecimals_24 > 0:
-        expected_24 *= Decimal(10) ** dDecimals_24
+    expected_24 = totalAssets * token_24.reference_price / Decimal(10 ** token_24.decimals)
     assert tvl_24 == expected_24, f"tvl_24={tvl_24}, expected_24={expected_24}"

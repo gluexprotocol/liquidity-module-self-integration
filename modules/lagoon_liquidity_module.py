@@ -177,14 +177,10 @@ class LagoonLiquidityModule(LiquidityModule):
         if token.symbol == "ETH" or token.symbol == "WETH":
             return Decimal(totalAssets)
         else:
-            ethDecimals = 18
             tokenDecimals = token.decimals
-            dDecimals = abs(ethDecimals - tokenDecimals)
+            tokenPrice = token.reference_price
 
-            tvl = totalAssets * token.reference_price
-            if dDecimals < 0:
-                tvl /= 10 ** dDecimals
-            elif dDecimals > 0:
-                tvl *= 10 ** dDecimals
+            tvl = totalAssets * tokenPrice
+            tvl /= Decimal(10 ** tokenDecimals)
 
             return tvl
