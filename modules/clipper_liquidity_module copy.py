@@ -41,18 +41,12 @@ class MyProtocolLiquidityModule(LiquidityModule):
 
         tvl = 0
 
-        for i, token in enumerate(allTokensBalance["tokens"]):
+        for i, token_ in enumerate(allTokensBalance["tokens"]):
             balance = allTokensBalance["balances"][i]
-
-            balance *= token.reference_price
+            balance *= token_.reference_price
             
-            d1 = 18 # Native token decimals
-            d2 = token.decimals
-
-            if d2 > d1:
-                balance /= 10 ** (d2 - d1)
-            elif d2 < d1:
-                balance *= 10 ** (d1 - d2)
+            d2 = token_.decimals
+            balance /= 10 ** d2
 
             tvl += balance
 
