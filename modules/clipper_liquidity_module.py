@@ -41,17 +41,6 @@ class ClipperLiquidityModule(LiquidityModule):
         input_amount: int,
         quote: Decimal
     ) -> tuple[Decimal | None, Decimal | None]:
-        """
-        Calculate the output amount and fee for a given input amount.
-        output_amount is in the lowest unit of asset0.
-        """
-
-        # already in output asset's lowest unit
-        # Example: Sell 1 ETH on ETH/USDC pair for 1 USDC
-        # `quote` is (1e6/1)/(1e18/1) which is equivalent to (1e6/1)*(1/1e18)
-        # 1e18   1e6    1
-        #      * --- * ---- = 1e6 (which is 1 USDC)
-        #         1    1e18
         output_amount = Decimal(input_amount) * quote
 
         feePercentage = Decimal(pair["fee_in_basis_points"]) / Decimal(10000)
@@ -61,8 +50,6 @@ class ClipperLiquidityModule(LiquidityModule):
         return fee, output_amount
     
     def _get_assets(self, pool: Dict, input_token: Token, output_token: Token) -> tuple[Optional[Dict], Optional[Dict]]:
-        # asset0 = input_token
-        # asset1 = output_token
         asset0 = None
         asset1 = None
 
@@ -105,7 +92,6 @@ class ClipperLiquidityModule(LiquidityModule):
             if pair is None:
                 continue
 
-            # quote = price_out / price_in
             quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
             if quote == 0:
                 return 0, 0
