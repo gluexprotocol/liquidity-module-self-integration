@@ -109,6 +109,32 @@ def test_get_apy_negative_balances(clipper_module):
     assert isinstance(apy, Decimal)
     assert apy == Decimal(0)
 
+def test_get_apy_compounded_negative_returns_zero(clipper_module):
+	"""
+	Test that get_apy returns Decimal(0) if the compounded APY is negative.
+	This can happen if the current LP token value is less than the previous value.
+	"""
+	pool_state = {
+		"allTokensBalance": {
+			"balances": [-1000 * 1e18],
+			"tokens": [
+				Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18")),
+			],
+			"totalSupply": 1000 * 1e18,
+		},
+		"previousAllTokensBalance": {
+			"balances": [2000 * 1e18],
+			"tokens": [
+				Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18")),
+			],
+			"totalSupply": 2000 * 1e18,
+		},
+		"days": 30,
+	}
+	apy = clipper_module.get_apy(pool_state)
+	assert isinstance(apy, Decimal)
+	assert apy == Decimal(0)
+
 def test_get_amount_out_basic(clipper_module):
     # Pool with swaps enabled, valid assets, and valid pair
     pool_states = {
@@ -371,6 +397,50 @@ def test_get_amount_out_multiple_pools_uses_first_valid(clipper_module):
 
     assert output == expected_output, "The function should have returned the result from the first valid pool"
 
+def test_get_amount_out_asset_not_exists(clipper_module):
+	"""
+	Tests get_amount_out when the input or output asset does not exist in the pool's assets list.
+	Should return (None, None).
+	"""
+	pool_states = {
+		"pools": [
+			{
+				"pool": {"swaps_enabled": True},
+				"assets": [
+					# Only USDC exists, ETH is missing
+					{"address": "0x1", "price_in_usd": "1", "decimals": 6}
+				],
+				"pairs": [
+					{"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+				]
+			}
+		]
+	}
+	fixed_parameters = {}
+	input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+	output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+	input_amount = 10**18
+	fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
+	assert fee is None and output is None
+
+	# Also test when output asset is missing
+	pool_states = {
+		"pools": [
+			{
+				"pool": {"swaps_enabled": True},
+				"assets": [
+					# Only ETH exists, USDC is missing
+					{"address": "0x0", "price_in_usd": "2000", "decimals": 18}
+				],
+				"pairs": [
+					{"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+				]
+			}
+		]
+	}
+	fee, output = clipper_module.get_amount_out(pool_states, fixed_parameters, input_token, output_token, input_amount)
+	assert fee is None and output is None
+
 def test_get_amount_in_basic(clipper_module):
     """Test a basic get_amount_in calculation with a valid pool, assets, and pair."""
     pool_states = {
@@ -534,3 +604,47 @@ def test_get_amount_in_precise_calculation_usdc_to_eth(clipper_module):
     assert isinstance(input_amt, int)
     assert fee == expected_fee
     assert input_amt == expected_input
+
+def test_get_amount_in_asset_not_exists(clipper_module):
+	"""
+	Tests get_amount_in when the input or output asset does not exist in the pool's assets list.
+	Should return (None, None).
+	"""
+	pool_states = {
+		"pools": [
+			{
+				"pool": {"swaps_enabled": True},
+				"assets": [
+					# Only USDC exists, ETH is missing
+					{"address": "0x1", "price_in_usd": "1", "decimals": 6}
+				],
+				"pairs": [
+					{"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+				]
+			}
+		]
+	}
+	fixed_parameters = {}
+	input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+	output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+	output_amount = 1_000_000
+	fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+	assert fee is None and input_amt is None
+
+	# Also test when output asset is missing
+	pool_states = {
+		"pools": [
+			{
+				"pool": {"swaps_enabled": True},
+				"assets": [
+					# Only ETH exists, USDC is missing
+					{"address": "0x0", "price_in_usd": "2000", "decimals": 18}
+				],
+				"pairs": [
+					{"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+				]
+			}
+		]
+	}
+	fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+	assert fee is None and input_amt is None
