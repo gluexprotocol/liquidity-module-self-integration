@@ -48,6 +48,23 @@ class ClipperLiquidityModule(LiquidityModule):
         
         output_amount -= fee
         return fee, output_amount
+    
+    def _get_amount_in(
+        self,
+        pair: Dict,
+        output_amount: int,
+        quote: Decimal
+    ) -> tuple[Decimal | None, Decimal | None]:
+        fee_percentage = Decimal(pair["fee_in_basis_points"]) / Decimal(10000)
+        
+        pre_fee_output = Decimal(output_amount) / (Decimal(1) - fee_percentage)
+        
+        total_input_amount = pre_fee_output / quote
+        
+        input_for_net_output = Decimal(output_amount) / quote
+        fee = total_input_amount - input_for_net_output
+        
+        return fee, total_input_amount
 
     def _get_assets(self, pool: Dict, input_token: Token, output_token: Token) -> tuple[Optional[Dict], Optional[Dict]]:
         asset0 = None
@@ -79,30 +96,54 @@ class ClipperLiquidityModule(LiquidityModule):
         for pool in pools:
             if not pool["pool"]["swaps_enabled"]:
                 continue
+
             # asset_in = input_token, asset_out = output_token
             asset_in, asset_out = self._get_assets(pool, input_token, output_token)
             if asset_in is None or asset_out is None:
                 continue
+
             pair = self._get_pair(pool, input_token, output_token)
             if pair is None:
                 continue
+
             quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
             if quote == 0:
                 return 0, 0
+            
             fee, output_amount = self._get_amount_out(pair, input_amount, quote)
             return int(fee), int(output_amount)
         return None, None
 
     def get_amount_in(
         self,
-        pool_state: Dict,
+        pool_states: Dict, # Renamed from pool_state to match usage
         fixed_parameters: Dict,
         input_token: Token,
         output_token: Token,
         output_amount: int
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate required input amount given output amount
-        pass
+        # https://docs.clipper.exchange/disclaimers-and-technical/integrating-with-clipper-rfq/api-reference/api-v2/pool-v2#examples
+        pools = pool_states["pools"]
+        for pool in pools:
+            if not pool["pool"]["swaps_enabled"]:
+                continue
+            
+            asset_in, asset_out = self._get_assets(pool, input_token, output_token)
+            if asset_in is None or asset_out is None:
+                continue
+                
+            pair = self._get_pair(pool, input_token, output_token)
+            if pair is None:
+                continue
+            
+            quote = self._get_quote_for(asset_out, asset_in, input_token, output_token)
+            if quote == 0:
+                return None, None
+            
+            fee, output_amount = self._get_amount_in(pair, output_amount, quote)
+            return int(fee), int(output_amount)
+        
+        return None, None
 
     def get_apy(self, pool_state: Dict) -> Decimal:
         lp_token_value = self._get_lptoken_value(pool_state, 1)

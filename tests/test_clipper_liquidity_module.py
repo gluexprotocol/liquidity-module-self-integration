@@ -370,3 +370,167 @@ def test_get_amount_out_multiple_pools_uses_first_valid(clipper_module):
     fee, output = clipper_module.get_amount_out(pool_states, {}, input_token, output_token, input_amount)
 
     assert output == expected_output, "The function should have returned the result from the first valid pool"
+
+def test_get_amount_in_basic(clipper_module):
+    """Test a basic get_amount_in calculation with a valid pool, assets, and pair."""
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    {"address": "0x0", "price_in_usd": "2000", "decimals": 18},
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6}
+                ],
+                "pairs": [
+                    {"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+                ]
+            }
+        ]
+    }
+    fixed_parameters = {}
+    input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 1_994_000_000  # 1994 USDC (after fee)
+    # Should require slightly more than 1 ETH due to fee
+    # Reverse calculation: input = output / (quote * (1 - fee))
+    # For this test, just check types and positivity
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert isinstance(fee, int)
+    assert isinstance(input_amt, int)
+    assert input_amt > 0
+
+
+def test_get_amount_in_swaps_disabled(clipper_module):
+    pool_states = {
+        "pools": [
+            {"pool": {"swaps_enabled": False}, "assets": [], "pairs": []}
+        ]
+    }
+    fixed_parameters = {}
+    input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 1_000_000
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee is None and input_amt is None
+
+
+def test_get_amount_in_no_valid_pair(clipper_module):
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    {"address": "0x0", "price_in_usd": "2000", "decimals": 18},
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6}
+                ],
+                "pairs": []
+            }
+        ]
+    }
+    fixed_parameters = {}
+    input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 1_000_000
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee is None and input_amt is None
+
+
+def test_get_amount_in_zero_quote(clipper_module):
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    {"address": "0x0", "price_in_usd": "0", "decimals": 18},
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6}
+                ],
+                "pairs": [
+                    {"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+                ]
+            }
+        ]
+    }
+    fixed_parameters = {}
+    input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 1_000_000
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee is None and input_amt is None
+
+
+def test_get_amount_in_zero_output(clipper_module):
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    {"address": "0x0", "price_in_usd": "2000", "decimals": 18},
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6}
+                ],
+                "pairs": [
+                    {"assets": ["ETH", "USDC"], "fee_in_basis_points": 30}
+                ]
+            }
+        ]
+    }
+    fixed_parameters = {}
+    input_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    output_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_amount = 0
+    fee, input_amt = clipper_module.get_amount_in(pool_states, fixed_parameters, input_token, output_token, output_amount)
+    assert fee == 0 and input_amt == 0
+
+
+def test_get_amount_in_precise_calculation_usdc_to_eth(clipper_module):
+    """
+    Tests a swap from USDC to ETH, verifying the exact fee and input amount required for a given output.
+    """
+    pool_states = {
+        "pools": [
+            {
+                "pool": {"swaps_enabled": True},
+                "assets": [
+                    # Input asset: USDC
+                    {"address": "0x1", "price_in_usd": "1", "decimals": 6},
+                    # Output asset: ETH
+                    {"address": "0x0", "price_in_usd": "2000", "decimals": 18}
+                ],
+                "pairs": [{"assets": ["USDC", "ETH"], "fee_in_basis_points": 30}] # 0.3% fee
+            }
+        ]
+    }
+    input_token = Token(address="0x1", symbol="USDC", decimals=6, reference_price=Decimal("3e14"))
+    output_token = Token(address="0x0", symbol="ETH", decimals=18, reference_price=Decimal("1e18"))
+    # The desired output is 1 ETH
+    output_amount = 1 * 10**18
+
+    # --- Manual Calculation for Verification ---
+    # 1. Quote to convert USDC (input) to ETH (output):
+    #    quote = (price_in / price_out) * 10**(decimals_out - decimals_in)
+    #    quote = (1 / 2000) * 10**(18 - 6) = 0.0005 * 1e12 = 5e8
+    #
+    # 2. Pre-fee output required:
+    #    pre_fee_output = final_output / (1 - fee_percentage)
+    #    pre_fee_output = 1e18 / (1 - 0.003) = 1e18 / 0.997
+    #
+    # 3. Total input required (in USDC lowest unit):
+    #    total_input = pre_fee_output / quote
+    #    total_input = (1e18 / 0.997) / 5e8 = 2006018054.162487...
+    #
+    # 4. Input required for the net amount (if no fee):
+    #    input_for_net = output_amount / quote = 1e18 / 5e8 = 2_000_000_000
+    #
+    # 5. Fee portion in USDC:
+    #    fee = total_input - input_for_net = 6018054.162487...
+
+    expected_input = 2006018054  # Truncated to int
+    expected_fee = 6018054       # Truncated to int
+
+    # Execute the function
+    fee, input_amt = clipper_module.get_amount_in(pool_states, {}, input_token, output_token, output_amount)
+
+    # Assert the exact integer values
+    assert isinstance(fee, int)
+    assert isinstance(input_amt, int)
+    assert fee == expected_fee
+    assert input_amt == expected_input
