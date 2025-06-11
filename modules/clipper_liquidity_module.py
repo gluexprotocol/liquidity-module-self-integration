@@ -210,10 +210,11 @@ class ClipperLiquidityModule(LiquidityModule):
     def get_apy(self, pool_state: Dict) -> Decimal:
         lp_token_value = self._get_lptoken_value(pool_state, 1)
 
-        old_all = pool_state["allTokensBalance"]
-        pool_state["allTokensBalance"] = pool_state["previousAllTokensBalance"]
-        pd_lp_token_value = self._get_lptoken_value(pool_state, 1)
-        pool_state["allTokensBalance"] = old_all
+        previous_tokens_balance = pool_state["previousAllTokensBalance"]
+        aux_pool_state = {
+            "allTokensBalance": previous_tokens_balance
+        }
+        pd_lp_token_value = self._get_lptoken_value(aux_pool_state, 1)
 
         days = pool_state["days"]
         if days == 0:
