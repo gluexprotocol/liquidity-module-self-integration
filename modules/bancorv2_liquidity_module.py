@@ -2,7 +2,7 @@ from templates.liquidity_module import LiquidityModule, Token
 from typing import Dict, Optional
 from decimal import Decimal
 
-class MyProtocolLiquidityModule(LiquidityModule):
+class BancorV2LiquidityModule(LiquidityModule):
     NATIVE_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".lower()
     
     def get_amount_out(
