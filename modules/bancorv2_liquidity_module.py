@@ -150,14 +150,27 @@ class BancorV2LiquidityModule(LiquidityModule):
         if average_rate_info.encode() != average_rate_info2.encode():
             # !!
             pool_state['average_rate_info'] = average_rate_info2.encode()
+    
+    def _crossReserveTargetAmount(
+        self,
+        source_balance: int, target_balance: int,
+        source_amount: int
+    ) -> int:
+        # Validation
+        if source_balance <= 0 or target_balance <= 0:
+            return 0
+        
+        return target_balance * source_amount // (source_balance + source_amount)
 
     def _targetAmountAndFee(
         self,
         pool_state: Dict, fixed_parameters: Dict,
         source_balance: int, target_balance: int,
         source_amount: int
-    ) -> tuple[int, int]:
+    ) -> tuple[Optional[int], Optional[int]]:
         target_amount = self._crossReserveTargetAmount(source_balance, target_balance, source_amount)
+        if target_amount <= 0:
+            return None, None
         
         conversion_fee = fixed_parameters.get('conversionFee', 0)
         fee = target_amount * conversion_fee // self.PPM_RESOLUTION
@@ -224,6 +237,8 @@ class BancorV2LiquidityModule(LiquidityModule):
             )
 
             # Validation
+            if fee is None or output_amount is None:
+                return None, None
             if output_amount > target_reserve:
                 # Not enough liquidity in the pool
                 return None, None
