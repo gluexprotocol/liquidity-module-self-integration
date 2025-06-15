@@ -368,10 +368,13 @@ class BancorV2LiquidityModule(LiquidityModule):
 
     def get_tvl(
         self, 
-        pool_state: Dict, 
+        pool_state: Dict,
+        fixed_parameters: Dict,
         pool_tokens: Dict[Token.address, Token]
     ) -> int:
         # LP Tokens are not included in the TVL calculation. Because they don't hold value.
+
+        converter_address = pool_state.get('converter_address', '').lower()
 
         # Obtainable from StandardPoolConverter.reserveBalances:
         # function reserveBalances() public view returns (uint256, uint256) {
@@ -392,11 +395,20 @@ class BancorV2LiquidityModule(LiquidityModule):
         
         tvl = 0
 
-        if token1_address == self.NATIVE_ASSET:
+        if self._is_ether_token(
+            fixed_parameters,
+            token1_address,
+            converter_address
+        ):
             tvl += reserve1
         else:
             tvl += reserve1 * rprice1 / (10 ** token1_decimals)
-        if token2_address == self.NATIVE_ASSET:
+
+        if self._is_ether_token(
+            fixed_parameters,
+            token2_address,
+            converter_address
+        ):
             tvl += reserve2
         else:
             tvl += reserve2 * rprice2 / (10 ** token2_decimals)
