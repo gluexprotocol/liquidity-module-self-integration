@@ -1,11 +1,18 @@
+from modules.objects.math import Math
 from templates.liquidity_module import LiquidityModule, Token
 from typing import Dict, Optional
 from decimal import Decimal
+from copy import deepcopy
+import time
+
+from .objects.average_rate_info import AverageRateInfo
 
 class BancorV2LiquidityModule(LiquidityModule):
     NATIVE_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".lower()
     AFFILIATE_FEE_RESOLUTION = 1_000_000
+    PPM_RESOLUTION = 1_000_000
     AFFILIATE_FEE = 10_000  # 1% fee, customizable by the referrer
+    AVERAGE_RATE_PERIOD = 10 * 60  # 10 minutes in seconds
 
     def _isV28OrHigherConverter(
         self,
@@ -76,6 +83,87 @@ class BancorV2LiquidityModule(LiquidityModule):
             return token_address.lower() == self.NATIVE_ASSET
         else:
             return etherTokens.get(token_address.lower(), False)
+    
+    def _calcRecentAverageRate(
+        self,
+        pool_state: Dict,
+        average_rate_info: AverageRateInfo
+    ) -> AverageRateInfo:
+        currentTime = int(time.time())
+        timeElapsed = currentTime - average_rate_info.t
+
+        if timeElapsed == 0:
+            # No time has passed, return the same average rate info
+            return average_rate_info
+        
+        currentRateD = pool_state.get('reserve1', 0)
+        currentRateN = pool_state.get('reserve2', 0)
+
+        if timeElapsed >= self.AVERAGE_RATE_PERIOD or average_rate_info.t:
+            currentRateN, currentRateD = Math.reduced_ratio(
+                currentRateN, currentRateD,
+                AverageRateInfo.MAX_UINT112
+            )
+            
+            average_rate_info.t = currentTime
+            average_rate_info.n = currentRateN
+            average_rate_info.d = currentRateD
+            return average_rate_info
+        
+        x = average_rate_info.d * currentRateN
+        y = average_rate_info.n * currentRateD
+
+        newRateN = y * (self.AVERAGE_RATE_PERIOD - timeElapsed) + x * timeElapsed
+        newRateD = average_rate_info.d * currentRateD * self.AVERAGE_RATE_PERIOD
+
+        newRateN, newRateD = Math.reduced_ratio(
+            newRateN, newRateD,
+            AverageRateInfo.MAX_UINT112
+        )
+
+        return AverageRateInfo(
+            t=currentTime,
+            n=newRateN,
+            d=newRateD
+        )
+
+    def _updateRecentAverageRate(
+        self,
+        pool_state: Dict
+    ):
+        """
+        !! This function has a mutating side-effect
+
+        Adapted from:
+
+            function _updateRecentAverageRate() private {
+                uint256 averageRateInfo1 = _averageRateInfo;
+                uint256 averageRateInfo2 = _calcRecentAverageRate(averageRateInfo1);
+                if (averageRateInfo1 != averageRateInfo2) {
+                    _averageRateInfo = averageRateInfo2;
+                }
+            }
+        """
+        # Obtained from averageRateInfo() function
+        average_rate_info = AverageRateInfo(pool_state.get('average_rate_info', 0))
+        average_rate_info2 = self._calcRecentAverageRate(pool_state, average_rate_info)
+        if average_rate_info.encode() != average_rate_info2.encode():
+            # !!
+            pool_state['average_rate_info'] = average_rate_info2.encode()
+
+    def _targetAmountAndFee(
+        self,
+        pool_state: Dict, fixed_parameters: Dict,
+        source_balance: int, target_balance: int,
+        source_amount: int
+    ) -> tuple[int, int]:
+        target_amount = self._crossReserveTargetAmount(source_balance, target_balance, source_amount)
+        
+        conversion_fee = fixed_parameters.get('conversionFee', 0)
+        fee = target_amount * conversion_fee // self.PPM_RESOLUTION
+        target_amount -= fee
+
+        return fee, target_amount
 
     def get_amount_out(
         self, 
@@ -101,6 +189,7 @@ class BancorV2LiquidityModule(LiquidityModule):
         #
 
         converter_address = pool_state.get('converter_address', '').lower()
+        aux_pool_state = deepcopy(pool_state)
         
         fee = 0
         output_amount = 0
@@ -112,14 +201,34 @@ class BancorV2LiquidityModule(LiquidityModule):
                 input_token, output_token,
                 input_amount
             )
-        elif self._is_ether_token(fixed_parameters, input_token.address, converter_address):
-            # Native asset conversion
-            pass
         else:
             # Non-native asset conversion
-            pass
+            # Example pool to swap ETH -> BNT: https://etherscan.deth.net/address/0xe331821bc94187c2649E932810A60204699d45cB
+            self._updateRecentAverageRate(self, aux_pool_state)
 
-        # Paid in output token
+            reserve_ids = pool_state.get('reserve_ids', {})
+            source_id = reserve_ids.get(input_token.address.lower())
+            target_id = reserve_ids.get(output_token.address.lower())
+            
+            source_reserve = aux_pool_state.get('reserve1', 0)
+            target_reserve = aux_pool_state.get('reserve2', 0)
+            if source_id == 2 and target_id == 1:
+                # swap position
+                source_reserve, target_reserve = target_reserve, source_reserve
+            
+            fee, output_amount = self._targetAmountAndFee(
+                aux_pool_state, fixed_parameters,
+
+                source_balance=source_reserve, target_balance=target_reserve,
+                source_amount=input_amount
+            )
+
+            # Validation
+            if output_amount > target_reserve:
+                # Not enough liquidity in the pool
+                return None, None
+
+        # Affiliate reward paid in output token
         affiliate_amount = output_amount * self.AFFILIATE_FEE / self.AFFILIATE_FEE_RESOLUTION
         output_amount -= affiliate_amount
         fee += affiliate_amount
