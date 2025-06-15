@@ -4,7 +4,79 @@ from decimal import Decimal
 
 class BancorV2LiquidityModule(LiquidityModule):
     NATIVE_ASSET = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".lower()
-    
+    AFFILIATE_FEE_RESOLUTION = 1_000_000
+    AFFILIATE_FEE = 10_000  # 1% fee, customizable by the referrer
+
+    def _isV28OrHigherConverter(
+        self,
+        fixed_parameters: Dict,
+        converter_address: str
+    ):
+        """
+        bytes4 private constant IS_V28_OR_HIGHER_FUNC_SELECTOR = bytes4(keccak256("isV28OrHigher()"));
+
+        // using assembly code to identify converter version
+        // can't rely on the version number since the function had a different signature in older converters
+        function isV28OrHigherConverter(IConverter _converter) internal view returns (bool) {
+            bool success;
+            uint256[1] memory ret;
+            bytes memory data = abi.encodeWithSelector(IS_V28_OR_HIGHER_FUNC_SELECTOR);
+
+            assembly {
+                success := staticcall(
+                    5000,          // isV28OrHigher consumes 190 gas, but just for extra safety
+                    _converter,    // destination address
+                    add(data, 32), // input buffer (starts after the first 32 bytes in the `data` array)
+                    mload(data),   // input length (loaded from the first 32 bytes in the `data` array)
+                    ret,           // output buffer
+                    32             // output length
+                )
+            }
+
+            return success && ret[0] != 0;
+        }
+        """
+
+        mapping = fixed_parameters.get('v28_or_higher_converters', {})
+        return converter_address.lower() in mapping
+
+    def _is_ether_token(
+        self, 
+        fixed_parameters: Dict, 
+        token_address: str,
+        converter_address: str
+    ) -> bool:
+        """
+            /**
+            * @dev allows the owner to register/unregister ether tokens
+            *
+            * @param _token       ether token contract address
+            * @param _register    true to register, false to unregister
+            */
+            function registerEtherToken(IEtherToken _token, bool _register)
+                public
+                ownerOnly
+                validAddress(_token)
+                notThis(_token)
+            {
+                etherTokens[_token] = _register;
+            }
+
+        Every tx called with _register == true adds the token to the etherTokens mapping.
+        Every tx called with _register == false removes the token from the etherTokens mapping.
+        Unfortunately, there is no event emitted when ether token is registered or unregistered.
+        key = token address (lowercase)
+        value = true if registered, false if unregistered
+        """
+
+        etherTokens = fixed_parameters.get('etherTokens', {})
+
+        if self._isV28OrHigherConverter(fixed_parameters, converter_address):
+            # In V28 or higher, the Ether token is always the native asset
+            return token_address.lower() == self.NATIVE_ASSET
+        else:
+            return etherTokens.get(token_address.lower(), False)
+
     def get_amount_out(
         self, 
         pool_state: Dict, 
@@ -13,8 +85,46 @@ class BancorV2LiquidityModule(LiquidityModule):
         output_token: Token,
         input_amount: int, 
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
-        pass
+        # Since BancorV2 does not accept deposit anymore, we ignore LP token swaps
+        # This very function is derived from the for loop inside of doConversion function in StandardPoolConverter.sol
+        # where each call is equivalent to these lines:
+        #
+        # if (!stepData.isV28OrHigherConverter)
+        #     toAmount = ILegacyConverter(stepData.converter).change(stepData.sourceToken, stepData.targetToken, fromAmount, 1);
+        # else if (etherTokens[stepData.sourceToken])
+        #     toAmount = stepData.converter.convert.value(msg.value)(stepData.sourceToken, stepData.targetToken, fromAmount, msg.sender, stepData.beneficiary);
+        # else
+        #     toAmount = stepData.converter.convert(stepData.sourceToken, stepData.targetToken, fromAmount, msg.sender, stepData.beneficiary);
+        #
+        # The function also handles affiliate fees which by default are designated for GlueX as its receiver.
+        # So, stepData.processAffiliateFee is always equals to true.
+        #
+
+        converter_address = pool_state.get('converter_address', '').lower()
+        
+        fee = 0
+        output_amount = 0
+
+        if not self._isV28OrHigherConverter(fixed_parameters, converter_address):
+            # legacy converter
+            output_amount, fee = self._legacy_change_out(
+                pool_state, fixed_parameters,
+                input_token, output_token,
+                input_amount
+            )
+        elif self._is_ether_token(fixed_parameters, input_token.address, converter_address):
+            # Native asset conversion
+            pass
+        else:
+            # Non-native asset conversion
+            pass
+
+        # Paid in output token
+        affiliate_amount = output_amount * self.AFFILIATE_FEE / self.AFFILIATE_FEE_RESOLUTION
+        output_amount -= affiliate_amount
+        fee += affiliate_amount
+
+        return fee, output_amount
 
     def get_amount_in(
         self, 
@@ -24,7 +134,7 @@ class BancorV2LiquidityModule(LiquidityModule):
         output_token: Token,
         output_amount: int
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate required input amount given output amount
+        # Implement logic to calculate output amount given input amount
         pass
 
     def get_apy(
@@ -67,6 +177,12 @@ class BancorV2LiquidityModule(LiquidityModule):
         
 
         # Fees in a pool can be obtained from `conversionFee` in this event in StandardPoolConverter contract:
+        # https://etherscan.deth.net/address/0xe331821bc94187c2649E932810A60204699d45cB
+        # Not to be confused with the Conversion event from BancorNetwork contract.
+        #
+        # Where a pool is a pair of sourceToken and targetToken. One swap transaction may emit multiple of these
+        # Conversion events, one for each source/target token pair (pool).
+        #
         # event Conversion(
         #     IReserveToken indexed sourceToken,
         #     IReserveToken indexed targetToken,
