@@ -161,6 +161,17 @@ class BancorV2LiquidityModule(LiquidityModule):
             return 0
         
         return target_balance * source_amount // (source_balance + source_amount)
+    
+    def _crossReserveSourceAmount(
+        self,
+        source_balance: int, target_balance: int,
+        target_amount: int
+    ) -> int:
+        # Validation
+        if target_amount <= 0:
+            return 0
+        
+        return (source_balance * target_amount - 1) // (target_balance - target_amount) + 1
 
     def _targetAmountAndFee(
         self,
@@ -258,8 +269,27 @@ class BancorV2LiquidityModule(LiquidityModule):
         output_token: Token,
         output_amount: int
     ) -> tuple[int | None, int | None]:
-        # Implement logic to calculate output amount given input amount
-        pass
+        # Adapted from sourceAmountAndFee() in StandardPoolConverter
+        reserve_ids = pool_state.get('reserve_ids', {})
+        source_id = reserve_ids.get(input_token.address.lower())
+        target_id = reserve_ids.get(output_token.address.lower())
+
+        if source_id == 2 and target_id == 1:
+            # swap position
+            source_id, target_id = target_id, source_id
+
+        source_reserve = pool_state.get('reserve1', 0)
+        target_reserve = pool_state.get('reserve2', 0)
+
+        conversion_fee = fixed_parameters.get('conversionFee', 0)
+
+        fee = output_amount * conversion_fee // (self.PPM_RESOLUTION - conversion_fee)
+        input_amount = self._crossReserveSourceAmount(
+            source_balance=source_reserve, target_balance=target_reserve,
+            target_amount=(output_amount + fee)
+        )
+
+        return fee, input_amount
 
     def get_apy(
 		self, 
